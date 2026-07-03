@@ -29,7 +29,7 @@ public class User extends BaseEntity {
 	private UUID id;
 
 	@Column(unique = true)
-	private String firebaseUid;
+	private String authUid;
 
 	@Column(nullable = false)
 	private String name;

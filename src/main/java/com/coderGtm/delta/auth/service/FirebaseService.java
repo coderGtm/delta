@@ -1,4 +1,4 @@
-package com.coderGtm.delta.auth;
+package com.coderGtm.delta.auth.service;
 
 import org.springframework.stereotype.Service;
 

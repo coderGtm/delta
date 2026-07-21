@@ -106,9 +106,10 @@ public class RefreshTokenService {
 	@Transactional
 	@Scheduled(fixedDelayString = "${jwt.refresh-token.cleanup-interval:86400000}")
 	public void cleanup() {
-		long expiredDeleted = refreshTokenRepository.deleteByExpiresAtBefore(Instant.now());
+	    Instant now = Instant.now();
+		long expiredDeleted = refreshTokenRepository.deleteByExpiresAtBefore(now);
 		long revokedDeleted = refreshTokenRepository.deleteByRevokedTrueAndUpdatedAtBefore(
-			Instant.now().minusMillis(revokedTokenRetention)
+			now.minusMillis(revokedTokenRetention)
 		);
 
 		if (expiredDeleted > 0 || revokedDeleted > 0) {

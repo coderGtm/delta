@@ -2,9 +2,11 @@ package com.coderGtm.delta.attendance.service;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,9 +17,11 @@ import com.coderGtm.delta.attendance.dto.UpdateAttendanceEntryRequest;
 import com.coderGtm.delta.attendance.entity.AttendanceEntry;
 import com.coderGtm.delta.attendance.mapper.AttendanceMapper;
 import com.coderGtm.delta.attendance.repository.AttendanceEntryRepository;
+import com.coderGtm.delta.common.dto.PageResponse;
 import com.coderGtm.delta.common.exception.BadRequestException;
 import com.coderGtm.delta.common.exception.ForbiddenException;
 import com.coderGtm.delta.common.exception.ResourceNotFoundException;
+import com.coderGtm.delta.common.util.PaginationUtils;
 import com.coderGtm.delta.outlet.entity.OutletMembership;
 import com.coderGtm.delta.outlet.entity.OutletMembershipStatus;
 import com.coderGtm.delta.outlet.entity.OutletRole;
@@ -100,27 +104,37 @@ public class AttendanceService {
 	 * by user, while employees may only view their own entries.
 	 */
 	@Transactional(readOnly = true)
-	public List<AttendanceEntryResponse> getAttendanceEntries(UUID currentUserId, UUID outletId, UUID userId) {
+	public PageResponse<AttendanceEntryResponse> getAttendanceEntries(
+		UUID currentUserId,
+		UUID outletId,
+		UUID userId,
+		Pageable pageable
+	) {
 		OutletMembership currentMembership = assertAcceptedCurrentMembership(outletId, currentUserId);
+		Pageable sortedPageable = PaginationUtils.withDefaultSort(
+			pageable,
+			Sort.by(Sort.Order.desc("entryTime"), Sort.Order.desc("createdAt"))
+		);
 
 		if (currentMembership.getRole() == OutletRole.OWNER) {
-			List<AttendanceEntry> entries = userId == null
-				? attendanceEntryRepository.findAllByOutlet_IdOrderByEntryTimeDescCreatedAtDesc(outletId)
-				: attendanceEntryRepository.findAllByOutlet_IdAndUser_IdOrderByEntryTimeDescCreatedAtDesc(outletId, userId);
+			Page<AttendanceEntry> entries = userId == null
+				? attendanceEntryRepository.findAllByOutlet_Id(outletId, sortedPageable)
+				: attendanceEntryRepository.findAllByOutlet_IdAndUser_Id(outletId, userId, sortedPageable);
 
-			return entries.stream()
-				.map(attendanceMapper::toResponse)
-				.toList();
+			return PaginationUtils.toPageResponse(entries, attendanceMapper::toResponse);
 		}
 
 		if (userId != null && !userId.equals(currentUserId)) {
 			throw new ForbiddenException("Employees can only view their own attendance entries");
 		}
 
-		return attendanceEntryRepository.findAllByOutlet_IdAndUser_IdOrderByEntryTimeDescCreatedAtDesc(outletId, currentUserId)
-			.stream()
-			.map(attendanceMapper::toResponse)
-			.toList();
+		Page<AttendanceEntry> entries = attendanceEntryRepository.findAllByOutlet_IdAndUser_Id(
+			outletId,
+			currentUserId,
+			sortedPageable
+		);
+
+		return PaginationUtils.toPageResponse(entries, attendanceMapper::toResponse);
 	}
 
 	/**

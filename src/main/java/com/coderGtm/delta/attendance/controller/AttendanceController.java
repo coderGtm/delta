@@ -1,8 +1,9 @@
 package com.coderGtm.delta.attendance.controller;
 
-import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.coderGtm.delta.attendance.dto.AttendanceEntryResponse;
+import com.coderGtm.delta.common.dto.PageResponse;
 import com.coderGtm.delta.attendance.dto.CreateAttendanceEntryRequest;
 import com.coderGtm.delta.attendance.dto.ManageAttendanceEntryRequest;
 import com.coderGtm.delta.attendance.dto.UpdateAttendanceEntryRequest;
@@ -70,12 +72,13 @@ public class AttendanceController {
 	 * user, while employees only receive their own records.
 	 */
 	@GetMapping("/{outletId}/attendance")
-	public ResponseEntity<List<AttendanceEntryResponse>> getAttendanceEntries(
+	public ResponseEntity<PageResponse<AttendanceEntryResponse>> getAttendanceEntries(
 		@AuthenticationPrincipal User currentUser,
 		@PathVariable UUID outletId,
-		@RequestParam(required = false) UUID userId
+		@RequestParam(required = false) UUID userId,
+		@PageableDefault(size = 20) Pageable pageable
 	) {
-		return ResponseEntity.ok(attendanceService.getAttendanceEntries(currentUser.getId(), outletId, userId));
+		return ResponseEntity.ok(attendanceService.getAttendanceEntries(currentUser.getId(), outletId, userId, pageable));
 	}
 
 	/**

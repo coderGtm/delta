@@ -1,8 +1,9 @@
 package com.coderGtm.delta.outlet.controller;
 
-import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.coderGtm.delta.common.dto.PageResponse;
 import com.coderGtm.delta.outlet.dto.CreateOutletRequest;
 import com.coderGtm.delta.outlet.dto.InviteOutletMemberRequest;
 import com.coderGtm.delta.outlet.dto.OutletMembershipResponse;
@@ -77,27 +79,34 @@ public class OutletController {
 	 * Lists all outlets that the authenticated user has already joined.
 	 */
 	@GetMapping("/mine")
-	public ResponseEntity<List<OutletMembershipResponse>> getMyOutlets(@AuthenticationPrincipal User currentUser) {
-		return ResponseEntity.ok(outletService.getMyOutlets(currentUser.getId()));
+	public ResponseEntity<PageResponse<OutletMembershipResponse>> getMyOutlets(
+		@AuthenticationPrincipal User currentUser,
+		@PageableDefault(size = 20) Pageable pageable
+	) {
+		return ResponseEntity.ok(outletService.getMyOutlets(currentUser.getId(), pageable));
 	}
 
 	/**
 	 * Lists all pending outlet invitations for the authenticated user.
 	 */
 	@GetMapping("/invites")
-	public ResponseEntity<List<OutletMembershipResponse>> getMyInvites(@AuthenticationPrincipal User currentUser) {
-		return ResponseEntity.ok(outletService.getMyInvites(currentUser.getId()));
+	public ResponseEntity<PageResponse<OutletMembershipResponse>> getMyInvites(
+		@AuthenticationPrincipal User currentUser,
+		@PageableDefault(size = 20) Pageable pageable
+	) {
+		return ResponseEntity.ok(outletService.getMyInvites(currentUser.getId(), pageable));
 	}
 
 	/**
 	 * Lists all memberships for an outlet. Only accepted owners can access it.
 	 */
 	@GetMapping("/{outletId}/memberships")
-	public ResponseEntity<List<OutletMembershipResponse>> getOutletMemberships(
+	public ResponseEntity<PageResponse<OutletMembershipResponse>> getOutletMemberships(
 		@AuthenticationPrincipal User currentUser,
-		@PathVariable UUID outletId
+		@PathVariable UUID outletId,
+		@PageableDefault(size = 20) Pageable pageable
 	) {
-		return ResponseEntity.ok(outletService.getOutletMemberships(currentUser.getId(), outletId));
+		return ResponseEntity.ok(outletService.getOutletMemberships(currentUser.getId(), outletId, pageable));
 	}
 
 	/**

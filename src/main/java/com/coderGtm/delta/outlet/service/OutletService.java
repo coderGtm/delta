@@ -1,17 +1,21 @@
 package com.coderGtm.delta.outlet.service;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.coderGtm.delta.common.dto.PageResponse;
 import com.coderGtm.delta.common.exception.BadRequestException;
 import com.coderGtm.delta.common.exception.ConflictException;
 import com.coderGtm.delta.common.exception.ForbiddenException;
 import com.coderGtm.delta.common.exception.ResourceNotFoundException;
+import com.coderGtm.delta.common.util.PaginationUtils;
 import com.coderGtm.delta.outlet.dto.CreateOutletRequest;
 import com.coderGtm.delta.outlet.dto.InviteOutletMemberRequest;
 import com.coderGtm.delta.outlet.dto.OutletMembershipResponse;
@@ -105,38 +109,43 @@ public class OutletService {
 	 * Lists all outlets that the current user has accepted membership in.
 	 */
 	@Transactional(readOnly = true)
-	public List<OutletMembershipResponse> getMyOutlets(UUID currentUserId) {
-		return outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNullOrderByUpdatedAtDesc(
+	public PageResponse<OutletMembershipResponse> getMyOutlets(UUID currentUserId, Pageable pageable) {
+		Page<OutletMembership> memberships = outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNull(
 			currentUserId,
-			OutletMembershipStatus.ACCEPTED
-		).stream()
-			.map(outletMapper::toMembershipResponse)
-			.toList();
+			OutletMembershipStatus.ACCEPTED,
+			PaginationUtils.withDefaultSort(pageable, Sort.by(Sort.Direction.DESC, "updatedAt"))
+		);
+
+		return PaginationUtils.toPageResponse(memberships, outletMapper::toMembershipResponse);
 	}
 
 	/**
 	 * Lists all pending outlet invitations for the current user.
 	 */
 	@Transactional(readOnly = true)
-	public List<OutletMembershipResponse> getMyInvites(UUID currentUserId) {
-		return outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNullOrderByUpdatedAtDesc(
+	public PageResponse<OutletMembershipResponse> getMyInvites(UUID currentUserId, Pageable pageable) {
+		Page<OutletMembership> memberships = outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNull(
 			currentUserId,
-			OutletMembershipStatus.INVITED
-		).stream()
-			.map(outletMapper::toMembershipResponse)
-			.toList();
+			OutletMembershipStatus.INVITED,
+			PaginationUtils.withDefaultSort(pageable, Sort.by(Sort.Direction.DESC, "updatedAt"))
+		);
+
+		return PaginationUtils.toPageResponse(memberships, outletMapper::toMembershipResponse);
 	}
 
 	/**
 	 * Lists all memberships for an outlet. Only accepted owners may call this.
 	 */
 	@Transactional(readOnly = true)
-	public List<OutletMembershipResponse> getOutletMemberships(UUID currentUserId, UUID outletId) {
+	public PageResponse<OutletMembershipResponse> getOutletMemberships(UUID currentUserId, UUID outletId, Pageable pageable) {
 		assertAcceptedOwner(outletId, currentUserId);
 
-		return outletMembershipRepository.findAllByOutlet_IdAndRemovedAtIsNullOrderByCreatedAtAsc(outletId).stream()
-			.map(outletMapper::toMembershipResponse)
-			.toList();
+		Page<OutletMembership> memberships = outletMembershipRepository.findAllByOutlet_IdAndRemovedAtIsNull(
+			outletId,
+			PaginationUtils.withDefaultSort(pageable, Sort.by(Sort.Direction.ASC, "createdAt"))
+		);
+
+		return PaginationUtils.toPageResponse(memberships, outletMapper::toMembershipResponse);
 	}
 
 	/**

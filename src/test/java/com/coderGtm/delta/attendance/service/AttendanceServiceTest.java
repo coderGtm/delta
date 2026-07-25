@@ -16,6 +16,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -30,6 +32,7 @@ import com.coderGtm.delta.attendance.entity.AttendanceEntry;
 import com.coderGtm.delta.attendance.entity.AttendanceEntryType;
 import com.coderGtm.delta.attendance.mapper.AttendanceMapper;
 import com.coderGtm.delta.attendance.repository.AttendanceEntryRepository;
+import com.coderGtm.delta.common.dto.PageResponse;
 import com.coderGtm.delta.common.exception.BadRequestException;
 import com.coderGtm.delta.common.exception.ForbiddenException;
 import com.coderGtm.delta.outlet.entity.Outlet;
@@ -205,17 +208,29 @@ class AttendanceServiceTest {
 
 		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
 			.thenReturn(Optional.of(ownerMembership));
-		when(attendanceEntryRepository.findAllByOutlet_IdAndUser_IdOrderByEntryTimeDescCreatedAtDesc(outletId, removedEmployeeId))
-			.thenReturn(List.of(historicalEntry));
+		when(attendanceEntryRepository.findAllByOutlet_IdAndUser_Id(
+			outletId,
+			removedEmployeeId,
+			PageRequest.of(
+				0,
+				20,
+				org.springframework.data.domain.Sort.by(
+					org.springframework.data.domain.Sort.Order.desc("entryTime"),
+					org.springframework.data.domain.Sort.Order.desc("createdAt")
+				)
+			)
+		)).thenReturn(new PageImpl<>(List.of(historicalEntry), PageRequest.of(0, 20), 1));
 
-		List<AttendanceEntryResponse> responses = attendanceService.getAttendanceEntries(
+		PageResponse<AttendanceEntryResponse> responses = attendanceService.getAttendanceEntries(
 			ownerId,
 			outletId,
-			removedEmployeeId
+			removedEmployeeId,
+			PageRequest.of(0, 20)
 		);
 
-		assertThat(responses).hasSize(1);
-		assertThat(responses.getFirst().userId()).isEqualTo(removedEmployeeId);
+		assertThat(responses.content()).hasSize(1);
+		assertThat(responses.content().getFirst().userId()).isEqualTo(removedEmployeeId);
+		assertThat(responses.totalElements()).isEqualTo(1);
 		verify(outletMembershipRepository, never())
 			.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, removedEmployeeId);
 	}

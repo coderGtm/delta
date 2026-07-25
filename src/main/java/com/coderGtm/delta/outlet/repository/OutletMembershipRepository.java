@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -23,11 +25,12 @@ public interface OutletMembershipRepository extends JpaRepository<OutletMembersh
 	Optional<OutletMembership> findDetailedByIdAndRemovedAtIsNull(UUID id);
 
 	@EntityGraph(attributePaths = {"outlet", "user", "invitedBy", "removedBy"})
-	List<OutletMembership> findAllByUser_IdAndStatusAndRemovedAtIsNullOrderByUpdatedAtDesc(
+	Page<OutletMembership> findAllByUser_IdAndStatusAndRemovedAtIsNull(
 		UUID userId,
-		OutletMembershipStatus status
+		OutletMembershipStatus status,
+		Pageable pageable
 	);
 
 	@EntityGraph(attributePaths = {"outlet", "user", "invitedBy", "removedBy"})
-	List<OutletMembership> findAllByOutlet_IdAndRemovedAtIsNullOrderByCreatedAtAsc(UUID outletId);
+	Page<OutletMembership> findAllByOutlet_IdAndRemovedAtIsNull(UUID outletId, Pageable pageable);
 }

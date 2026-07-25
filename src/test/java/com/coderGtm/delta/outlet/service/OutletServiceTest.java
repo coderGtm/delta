@@ -13,11 +13,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.coderGtm.delta.common.dto.PageResponse;
 import com.coderGtm.delta.common.exception.BadRequestException;
 import com.coderGtm.delta.common.exception.ConflictException;
 import com.coderGtm.delta.common.exception.ForbiddenException;
@@ -212,21 +215,26 @@ class OutletServiceTest {
 	}
 
 	@Test
-	void getMyInvitesReturnsOnlyPendingInvitations() {
+	void getMyInvitesReturnsOnlyPendingInvitationsInPageResponse() {
 		UUID userId = UUID.randomUUID();
 		User employee = user(userId, "employee@example.com", "Employee");
 		User owner = user(UUID.randomUUID(), "owner@example.com", "Owner");
 		Outlet outlet = outlet(UUID.randomUUID(), "Outlet A");
 		OutletMembership invite = membership(UUID.randomUUID(), outlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.INVITED);
 		invite.setInvitedBy(owner);
-		when(outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNullOrderByUpdatedAtDesc(userId, OutletMembershipStatus.INVITED))
-			.thenReturn(List.of(invite));
+		when(outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNull(
+			userId,
+			OutletMembershipStatus.INVITED,
+			PageRequest.of(0, 20, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "updatedAt"))
+		)).thenReturn(new PageImpl<>(List.of(invite), PageRequest.of(0, 20), 1));
 
-		List<OutletMembershipResponse> invites = outletService.getMyInvites(userId);
+		PageResponse<OutletMembershipResponse> invites = outletService.getMyInvites(userId, PageRequest.of(0, 20));
 
-		assertThat(invites).hasSize(1);
-		assertThat(invites.getFirst().status()).isEqualTo(OutletMembershipStatus.INVITED);
-		assertThat(invites.getFirst().invitedByUserName()).isEqualTo("Owner");
+		assertThat(invites.content()).hasSize(1);
+		assertThat(invites.content().getFirst().status()).isEqualTo(OutletMembershipStatus.INVITED);
+		assertThat(invites.content().getFirst().invitedByUserName()).isEqualTo("Owner");
+		assertThat(invites.totalElements()).isEqualTo(1);
+		assertThat(invites.first()).isTrue();
 	}
 
 	@Test

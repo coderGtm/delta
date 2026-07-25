@@ -8,19 +8,20 @@ auth
  ├── dto
  └── mapper
 
-users
- ├── controller
- ├── service
+user
  ├── repository
- ├── entity
- ├── dto
- └── mapper
+ ├── service
+ └── User.java
 
-outlets
+outlet
  ├── controller
  ├── service
  ├── repository
  ├── entity
+ │    ├── Outlet
+ │    ├── OutletMembership
+ │    ├── OutletRole
+ │    └── OutletMembershipStatus
  ├── dto
  └── mapper
 
@@ -33,6 +34,4 @@ attendance
  └── mapper
 
 common
-security
 config
-exception

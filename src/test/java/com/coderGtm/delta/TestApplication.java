@@ -11,7 +11,10 @@ import com.coderGtm.delta.config.FirebaseConfig;
 
 @SpringBootConfiguration
 @EnableAutoConfiguration
-@EnableJpaAuditing
+@EnableJpaAuditing(
+	auditorAwareRef = "auditorAware",
+	dateTimeProviderRef = "auditingDateTimeProvider"
+)
 @EnableScheduling
 @ComponentScan(
 	basePackages = "com.coderGtm.delta",

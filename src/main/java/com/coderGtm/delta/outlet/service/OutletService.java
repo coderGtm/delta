@@ -1,0 +1,296 @@
+package com.coderGtm.delta.outlet.service;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.coderGtm.delta.common.exception.BadRequestException;
+import com.coderGtm.delta.common.exception.ConflictException;
+import com.coderGtm.delta.common.exception.ForbiddenException;
+import com.coderGtm.delta.common.exception.ResourceNotFoundException;
+import com.coderGtm.delta.outlet.dto.CreateOutletRequest;
+import com.coderGtm.delta.outlet.dto.InviteOutletMemberRequest;
+import com.coderGtm.delta.outlet.dto.OutletMembershipResponse;
+import com.coderGtm.delta.outlet.dto.OutletResponse;
+import com.coderGtm.delta.outlet.dto.UpdateOutletRequest;
+import com.coderGtm.delta.outlet.entity.Outlet;
+import com.coderGtm.delta.outlet.entity.OutletMembership;
+import com.coderGtm.delta.outlet.entity.OutletMembershipStatus;
+import com.coderGtm.delta.outlet.entity.OutletRole;
+import com.coderGtm.delta.outlet.mapper.OutletMapper;
+import com.coderGtm.delta.outlet.repository.OutletMembershipRepository;
+import com.coderGtm.delta.outlet.repository.OutletRepository;
+import com.coderGtm.delta.user.User;
+import com.coderGtm.delta.user.UserRepository;
+
+import lombok.RequiredArgsConstructor;
+
+/**
+ * Encapsulates outlet and outlet membership use cases.
+ *
+ * <p>This service deliberately keeps authorization and invitation lifecycle
+ * rules in one place so controllers stay thin and future attendance rules can
+ * rely on the same membership semantics.</p>
+ */
+@Service
+@RequiredArgsConstructor
+public class OutletService {
+
+	private final OutletRepository outletRepository;
+	private final OutletMembershipRepository outletMembershipRepository;
+	private final UserRepository userRepository;
+	private final OutletMapper outletMapper;
+
+	/**
+	 * Creates a new outlet and immediately assigns the creator as an accepted
+	 * owner for that outlet.
+	 */
+	@Transactional
+	public OutletResponse createOutlet(UUID currentUserId, CreateOutletRequest request) {
+		User currentUser = getActiveUser(currentUserId);
+
+		Outlet outlet = new Outlet();
+		outlet.setName(request.name().trim());
+		outlet.setLatitude(request.latitude());
+		outlet.setLongitude(request.longitude());
+		outlet.setRadiusMeters(request.radiusMeters());
+
+		Outlet savedOutlet = outletRepository.save(outlet);
+
+		OutletMembership ownerMembership = new OutletMembership();
+		ownerMembership.setOutlet(savedOutlet);
+		ownerMembership.setUser(currentUser);
+		ownerMembership.setRole(OutletRole.OWNER);
+		ownerMembership.setStatus(OutletMembershipStatus.ACCEPTED);
+		ownerMembership.setInvitedBy(null);
+		outletMembershipRepository.save(ownerMembership);
+
+		return outletMapper.toOutletResponse(savedOutlet);
+	}
+
+	/**
+	 * Returns outlet details for the current user if they have already accepted a
+	 * membership in that outlet.
+	 */
+	@Transactional(readOnly = true)
+	public OutletResponse getOutlet(UUID currentUserId, UUID outletId) {
+		OutletMembership membership = getMembershipOrThrow(outletId, currentUserId);
+		ensureAcceptedMembership(membership);
+		return outletMapper.toOutletResponse(membership.getOutlet());
+	}
+
+	/**
+	 * Updates the core editable details of an outlet.
+	 */
+	@Transactional
+	public OutletResponse updateOutlet(UUID currentUserId, UUID outletId, UpdateOutletRequest request) {
+		assertAcceptedOwner(outletId, currentUserId);
+
+		Outlet outlet = outletRepository.findById(outletId)
+			.orElseThrow(() -> new ResourceNotFoundException("Outlet not found: " + outletId));
+
+		outlet.setName(request.name().trim());
+		outlet.setLatitude(request.latitude());
+		outlet.setLongitude(request.longitude());
+		outlet.setRadiusMeters(request.radiusMeters());
+
+		return outletMapper.toOutletResponse(outletRepository.save(outlet));
+	}
+
+	/**
+	 * Lists all outlets that the current user has accepted membership in.
+	 */
+	@Transactional(readOnly = true)
+	public List<OutletMembershipResponse> getMyOutlets(UUID currentUserId) {
+		return outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNullOrderByUpdatedAtDesc(
+			currentUserId,
+			OutletMembershipStatus.ACCEPTED
+		).stream()
+			.map(outletMapper::toMembershipResponse)
+			.toList();
+	}
+
+	/**
+	 * Lists all pending outlet invitations for the current user.
+	 */
+	@Transactional(readOnly = true)
+	public List<OutletMembershipResponse> getMyInvites(UUID currentUserId) {
+		return outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNullOrderByUpdatedAtDesc(
+			currentUserId,
+			OutletMembershipStatus.INVITED
+		).stream()
+			.map(outletMapper::toMembershipResponse)
+			.toList();
+	}
+
+	/**
+	 * Lists all memberships for an outlet. Only accepted owners may call this.
+	 */
+	@Transactional(readOnly = true)
+	public List<OutletMembershipResponse> getOutletMemberships(UUID currentUserId, UUID outletId) {
+		assertAcceptedOwner(outletId, currentUserId);
+
+		return outletMembershipRepository.findAllByOutlet_IdAndRemovedAtIsNullOrderByCreatedAtAsc(outletId).stream()
+			.map(outletMapper::toMembershipResponse)
+			.toList();
+	}
+
+	/**
+	 * Invites an existing user to join the outlet as an employee.
+	 *
+	 * <p>If the user had previously rejected the outlet, the invitation is
+	 * reopened by moving the status back to {@code INVITED}.</p>
+	 */
+	@Transactional
+	public OutletMembershipResponse inviteMember(UUID currentUserId, UUID outletId, InviteOutletMemberRequest request) {
+		User inviter = assertAcceptedOwner(outletId, currentUserId);
+		User invitee = userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull(normalizeEmail(request.email()))
+			.orElseThrow(() -> new ResourceNotFoundException("No active user found for email: " + request.email().trim()));
+
+		OutletMembership existingMembership = outletMembershipRepository.findByOutlet_IdAndUser_Id(outletId, invitee.getId())
+			.orElse(null);
+
+		if (existingMembership != null) {
+			if (existingMembership.getRemovedAt() == null && existingMembership.getStatus() == OutletMembershipStatus.ACCEPTED) {
+				throw new ConflictException("User is already an active member of this outlet");
+			}
+
+			if (existingMembership.getRemovedAt() == null && existingMembership.getStatus() == OutletMembershipStatus.INVITED) {
+				throw new ConflictException("User already has a pending invitation for this outlet");
+			}
+
+			existingMembership.setRole(OutletRole.EMPLOYEE);
+			existingMembership.setStatus(OutletMembershipStatus.INVITED);
+			existingMembership.setInvitedBy(inviter);
+			existingMembership.setRemovedAt(null);
+			existingMembership.setRemovedBy(null);
+
+			try {
+				OutletMembership savedMembership = outletMembershipRepository.save(existingMembership);
+				return outletMapper.toMembershipResponse(getMembershipDetails(savedMembership.getId()));
+			} catch (DataIntegrityViolationException ex) {
+				throw new ConflictException("User already has a membership record for this outlet");
+			}
+		}
+
+		Outlet outlet = outletRepository.findById(outletId)
+			.orElseThrow(() -> new ResourceNotFoundException("Outlet not found: " + outletId));
+
+		OutletMembership membership = new OutletMembership();
+		membership.setOutlet(outlet);
+		membership.setUser(invitee);
+		membership.setRole(OutletRole.EMPLOYEE);
+		membership.setStatus(OutletMembershipStatus.INVITED);
+		membership.setInvitedBy(inviter);
+		membership.setRemovedAt(null);
+		membership.setRemovedBy(null);
+
+		try {
+			OutletMembership savedMembership = outletMembershipRepository.save(membership);
+			return outletMapper.toMembershipResponse(getMembershipDetails(savedMembership.getId()));
+		} catch (DataIntegrityViolationException ex) {
+			throw new ConflictException("User already has a membership record for this outlet");
+		}
+	}
+
+	/**
+	 * Accepts an invitation for the current user.
+	 */
+	@Transactional
+	public OutletMembershipResponse acceptInvite(UUID currentUserId, UUID membershipId) {
+		OutletMembership membership = getMembershipDetails(membershipId);
+		assertInviteTarget(membership, currentUserId);
+
+		if (membership.getStatus() != OutletMembershipStatus.INVITED) {
+			throw new BadRequestException("Only pending invitations can be accepted");
+		}
+
+		membership.setStatus(OutletMembershipStatus.ACCEPTED);
+		return outletMapper.toMembershipResponse(outletMembershipRepository.save(membership));
+	}
+
+	/**
+	 * Rejects an invitation for the current user.
+	 */
+	@Transactional
+	public OutletMembershipResponse rejectInvite(UUID currentUserId, UUID membershipId) {
+		OutletMembership membership = getMembershipDetails(membershipId);
+		assertInviteTarget(membership, currentUserId);
+
+		if (membership.getStatus() != OutletMembershipStatus.INVITED) {
+			throw new BadRequestException("Only pending invitations can be rejected");
+		}
+
+		membership.setStatus(OutletMembershipStatus.REJECTED);
+		return outletMapper.toMembershipResponse(outletMembershipRepository.save(membership));
+	}
+
+	/**
+	 * Soft-removes an employee membership so outlet access is revoked while
+	 * historical attendance entries can still remain associated with the same
+	 * user and outlet.
+	 */
+	@Transactional
+	public void removeMembership(UUID currentUserId, UUID outletId, UUID membershipId) {
+		User owner = assertAcceptedOwner(outletId, currentUserId);
+		OutletMembership membership = getMembershipDetails(membershipId);
+
+		if (!membership.getOutlet().getId().equals(outletId)) {
+			throw new BadRequestException("The provided membership does not belong to the requested outlet");
+		}
+
+		if (membership.getRole() == OutletRole.OWNER) {
+			throw new BadRequestException("Owner memberships cannot be removed through this endpoint");
+		}
+
+		membership.setRemovedAt(Instant.now());
+		membership.setRemovedBy(owner);
+		outletMembershipRepository.save(membership);
+	}
+
+	private User getActiveUser(UUID userId) {
+		return userRepository.findByIdAndDeletedAtIsNull(userId)
+			.orElseThrow(() -> new ResourceNotFoundException("Authenticated user was not found"));
+	}
+
+	private User assertAcceptedOwner(UUID outletId, UUID currentUserId) {
+		OutletMembership membership = getMembershipOrThrow(outletId, currentUserId);
+		ensureAcceptedMembership(membership);
+
+		if (membership.getRole() != OutletRole.OWNER) {
+			throw new ForbiddenException("Only outlet owners can perform this action");
+		}
+
+		return membership.getUser();
+	}
+
+	private OutletMembership getMembershipOrThrow(UUID outletId, UUID userId) {
+		return outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, userId)
+			.orElseThrow(() -> new ResourceNotFoundException("Outlet membership was not found for the current user"));
+	}
+
+	private OutletMembership getMembershipDetails(UUID membershipId) {
+		return outletMembershipRepository.findDetailedByIdAndRemovedAtIsNull(membershipId)
+			.orElseThrow(() -> new ResourceNotFoundException("Outlet membership not found: " + membershipId));
+	}
+
+	private void ensureAcceptedMembership(OutletMembership membership) {
+		if (membership.getStatus() != OutletMembershipStatus.ACCEPTED) {
+			throw new ForbiddenException("You must accept the outlet invitation before accessing this outlet");
+		}
+	}
+
+	private void assertInviteTarget(OutletMembership membership, UUID currentUserId) {
+		if (!membership.getUser().getId().equals(currentUserId)) {
+			throw new ForbiddenException("You can only manage your own outlet invitations");
+		}
+	}
+
+	private String normalizeEmail(String email) {
+		return email == null ? null : email.trim().toLowerCase();
+	}
+}

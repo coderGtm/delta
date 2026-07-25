@@ -10,11 +10,15 @@ import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
 import lombok.Getter;
 
+/**
+ * Base JPA superclass that contributes automatic creation and update
+ * timestamps to inheriting entities.
+ */
 @MappedSuperclass
 @Getter
 @EntityListeners(AuditingEntityListener.class)
 public abstract class BaseEntity {
-	
+
 	@CreatedDate
 	protected Instant createdAt;
 

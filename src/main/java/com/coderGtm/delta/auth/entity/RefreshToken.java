@@ -19,13 +19,19 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Persistent refresh token record.
+ *
+ * <p>Only a hash of the raw token is stored so leaked database contents do not
+ * expose reusable refresh tokens directly.</p>
+ */
 @Entity
 @Table(name = "refresh_tokens")
 @Getter
 @Setter
 @NoArgsConstructor
 public class RefreshToken extends BaseEntity {
-	
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
 	private UUID id;

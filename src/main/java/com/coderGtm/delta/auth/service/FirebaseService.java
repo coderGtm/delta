@@ -9,14 +9,20 @@ import com.google.firebase.auth.FirebaseToken;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Wraps Firebase Admin SDK interactions used by the authentication layer.
+ */
 @Service
 @RequiredArgsConstructor
 public class FirebaseService {
 
 	private final FirebaseAuth firebaseAuth;
 
+	/**
+	 * Verifies a Firebase ID token and extracts only the user fields needed by
+	 * the local application.
+	 */
 	public FirebaseUserInfo verifyIdToken(String idToken) throws FirebaseAuthException {
-
 		FirebaseToken decodedToken = firebaseAuth.verifyIdToken(idToken);
 
 		return new FirebaseUserInfo(

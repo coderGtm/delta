@@ -16,36 +16,41 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
+/**
+ * Creates and validates the application's access tokens.
+ */
 @Service
 public class JwtService {
-	
+
 	@Value("${jwt.secret}")
 	private String secret;
 
 	@Value("${jwt.access-token-expiration}")
 	private long accessTokenExpiration;
 
-	private Key getSigningKey() {
-		return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-	}
-
+	/**
+	 * Generates a short-lived access token whose subject is the local user ID.
+	 */
 	public String generateAccessToken(User user) {
-
 		return Jwts.builder()
-				.subject(user.getId().toString())
-				.issuedAt(new Date())
-				.expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
-				.signWith(getSigningKey())
-				.compact();
+			.subject(user.getId().toString())
+			.issuedAt(new Date())
+			.expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
+			.signWith(getSigningKey())
+			.compact();
 	}
 
+	/**
+	 * Extracts the local user ID embedded in the token subject.
+	 */
 	public UUID extractUserId(String token) {
-
 		Claims claims = parseClaims(token);
-
 		return UUID.fromString(claims.getSubject());
 	}
 
+	/**
+	 * Returns whether the token can be parsed and verified successfully.
+	 */
 	public boolean isTokenValid(String token) {
 		try {
 			parseClaims(token);
@@ -55,11 +60,15 @@ public class JwtService {
 		}
 	}
 
+	private Key getSigningKey() {
+		return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+	}
+
 	private Claims parseClaims(String token) {
 		return Jwts.parser()
-				.verifyWith((SecretKey) getSigningKey())
-				.build()
-				.parseSignedClaims(token)
-				.getPayload();
+			.verifyWith((SecretKey) getSigningKey())
+			.build()
+			.parseSignedClaims(token)
+			.getPayload();
 	}
 }

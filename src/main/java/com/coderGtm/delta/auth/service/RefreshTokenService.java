@@ -23,6 +23,10 @@ import com.coderGtm.delta.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Manages persistent refresh tokens, including validation, revocation, rotation,
+ * and background cleanup.
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -39,6 +43,9 @@ public class RefreshTokenService {
 	@Value("${jwt.refresh-token.revoked-retention:604800000}")
 	private long revokedTokenRetention;
 
+	/**
+	 * Issues and persists a new refresh token for the given user.
+	 */
 	@Transactional
 	public IssuedRefreshToken create(User user) {
 		String rawToken = generateRandomToken();
@@ -54,6 +61,9 @@ public class RefreshTokenService {
 		return new IssuedRefreshToken(user, rawToken, refreshToken.getExpiresAt());
 	}
 
+	/**
+	 * Validates a refresh token and returns its persisted record.
+	 */
 	@Transactional(readOnly = true)
 	public RefreshToken validate(String rawToken) {
 		RefreshToken refreshToken = refreshTokenRepository
@@ -71,6 +81,9 @@ public class RefreshTokenService {
 		return refreshToken;
 	}
 
+	/**
+	 * Revokes a single refresh token.
+	 */
 	@Transactional
 	public void revoke(String rawToken) {
 		RefreshToken refreshToken = validate(rawToken);
@@ -78,6 +91,9 @@ public class RefreshTokenService {
 		refreshTokenRepository.save(refreshToken);
 	}
 
+	/**
+	 * Revokes the current refresh token and issues a replacement.
+	 */
 	@Transactional
 	public IssuedRefreshToken rotate(String rawToken) {
 		RefreshToken currentToken = validate(rawToken);
@@ -88,11 +104,17 @@ public class RefreshTokenService {
 		return create(currentToken.getUser());
 	}
 
+	/**
+	 * Revokes all active refresh tokens for a user entity.
+	 */
 	@Transactional
 	public int revokeAllForUser(User user) {
 		return revokeAllForUserId(user.getId());
 	}
 
+	/**
+	 * Revokes all active refresh tokens for the provided user ID.
+	 */
 	@Transactional
 	public int revokeAllForUserId(UUID userId) {
 		List<RefreshToken> refreshTokens = refreshTokenRepository.findAllByUser_IdAndRevokedFalse(userId);
@@ -103,10 +125,14 @@ public class RefreshTokenService {
 		return refreshTokens.size();
 	}
 
+	/**
+	 * Periodically deletes expired tokens and old revoked tokens to keep the
+	 * backing table small.
+	 */
 	@Transactional
 	@Scheduled(fixedDelayString = "${jwt.refresh-token.cleanup-interval:86400000}")
 	public void cleanup() {
-	    Instant now = Instant.now();
+		Instant now = Instant.now();
 		long expiredDeleted = refreshTokenRepository.deleteByExpiresAtBefore(now);
 		long revokedDeleted = refreshTokenRepository.deleteByRevokedTrueAndUpdatedAtBefore(
 			now.minusMillis(revokedTokenRetention)
@@ -137,9 +163,13 @@ public class RefreshTokenService {
 		}
 	}
 
+	/**
+	 * Return type used internally when a raw refresh token value is generated.
+	 */
 	public record IssuedRefreshToken(
 		User user,
 		String refreshToken,
 		Instant expiresAt
-	) {}
+	) {
+	}
 }

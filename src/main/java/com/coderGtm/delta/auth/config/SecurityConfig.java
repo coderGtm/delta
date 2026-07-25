@@ -7,28 +7,38 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
 import com.coderGtm.delta.auth.filter.JwtAuthenticationFilter;
+
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Configures stateless security for the API.
+ *
+ * <p>The application authenticates requests using a bearer JWT rather than an
+ * HTTP session, so CSRF protection is disabled and the custom JWT filter is
+ * inserted before Spring Security's username/password authentication filter.</p>
+ */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-	
+
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-	@Bean 
+	/**
+	 * Builds the application's security filter chain.
+	 */
+	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		return http
-				.csrf(csrf -> csrf.disable())
-				.sessionManagement(sm ->
-					sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-				)
-				.authorizeHttpRequests(auth -> auth
-					.requestMatchers("/auth/login", "/auth/refresh", "/auth/logout").permitAll()
-					.anyRequest().authenticated()
-				)
-				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-				.build();
+			.csrf(csrf -> csrf.disable())
+			.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+			.authorizeHttpRequests(auth -> auth
+				.requestMatchers("/auth/login", "/auth/refresh", "/auth/logout").permitAll()
+				.anyRequest().authenticated()
+			)
+			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+			.build();
 	}
 }

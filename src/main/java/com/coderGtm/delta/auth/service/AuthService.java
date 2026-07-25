@@ -17,6 +17,9 @@ import com.google.firebase.auth.FirebaseAuthException;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Coordinates the application's login, refresh, and logout flows.
+ */
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -28,6 +31,10 @@ public class AuthService {
 	private final RefreshTokenService refreshTokenService;
 	private final AuthMapper authMapper;
 
+	/**
+	 * Verifies a Firebase ID token, creates the local user when needed, and
+	 * issues the application's token pair.
+	 */
 	public LoginResponse login(LoginRequest request) {
 		FirebaseUserInfo userInfo;
 
@@ -52,6 +59,9 @@ public class AuthService {
 		return authMapper.toResponse(user, accessToken, issuedRefreshToken.refreshToken());
 	}
 
+	/**
+	 * Rotates a refresh token and returns a fresh access token plus refresh token.
+	 */
 	public RefreshTokenResponse refresh(RefreshTokenRequest request) {
 		RefreshTokenService.IssuedRefreshToken rotatedToken = refreshTokenService.rotate(request.refreshToken());
 		String accessToken = jwtService.generateAccessToken(rotatedToken.user());
@@ -59,10 +69,16 @@ public class AuthService {
 		return new RefreshTokenResponse(accessToken, rotatedToken.refreshToken());
 	}
 
+	/**
+	 * Revokes a single refresh token.
+	 */
 	public void logout(LogoutRequest request) {
 		refreshTokenService.revoke(request.refreshToken());
 	}
 
+	/**
+	 * Revokes every active refresh token owned by the authenticated user.
+	 */
 	public void logoutAll(User user) {
 		refreshTokenService.revokeAllForUser(user);
 	}

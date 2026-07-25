@@ -16,6 +16,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Local application user synchronized from the external authentication system.
+ *
+ * <p>The {@code authUid} links this record to the upstream Firebase identity,
+ * while {@code deletedAt} allows soft deletion without immediately removing
+ * related business records.</p>
+ */
 @Entity
 @Table(name = "users")
 @Getter
@@ -23,7 +30,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class User extends BaseEntity {
-	
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
 	private UUID id;

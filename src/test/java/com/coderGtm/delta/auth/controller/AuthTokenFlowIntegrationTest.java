@@ -70,7 +70,7 @@ class AuthTokenFlowIntegrationTest {
 		User user = persistUser("refresh-user");
 		RefreshTokenService.IssuedRefreshToken issued = refreshTokenService.create(user);
 
-		MvcResult result = mockMvc.perform(post("/auth/refresh")
+		MvcResult result = mockMvc.perform(post("/api/v1/auth/refresh")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -94,7 +94,7 @@ class AuthTokenFlowIntegrationTest {
 
 	@Test
 	void refreshEndpointReturnsUnauthorizedForInvalidToken() throws Exception {
-		mockMvc.perform(post("/auth/refresh")
+		mockMvc.perform(post("/api/v1/auth/refresh")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -111,7 +111,7 @@ class AuthTokenFlowIntegrationTest {
 		User user = persistUser("logout-user");
 		RefreshTokenService.IssuedRefreshToken issued = refreshTokenService.create(user);
 
-		mockMvc.perform(post("/auth/logout")
+		mockMvc.perform(post("/api/v1/auth/logout")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -127,7 +127,7 @@ class AuthTokenFlowIntegrationTest {
 
 	@Test
 	void logoutAllRejectsUnauthenticatedRequests() throws Exception {
-		mockMvc.perform(post("/auth/logout-all"))
+		mockMvc.perform(post("/api/v1/auth/logout-all"))
 			.andExpect(status().isForbidden());
 	}
 
@@ -142,7 +142,7 @@ class AuthTokenFlowIntegrationTest {
 
 		String accessToken = jwtService.generateAccessToken(currentUser);
 
-		mockMvc.perform(post("/auth/logout-all")
+		mockMvc.perform(post("/api/v1/auth/logout-all")
 				.header("Authorization", "Bearer " + accessToken))
 			.andExpect(status().isNoContent());
 

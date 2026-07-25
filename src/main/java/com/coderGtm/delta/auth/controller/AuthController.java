@@ -14,6 +14,7 @@ import com.coderGtm.delta.auth.dto.LogoutRequest;
 import com.coderGtm.delta.auth.dto.RefreshTokenRequest;
 import com.coderGtm.delta.auth.dto.RefreshTokenResponse;
 import com.coderGtm.delta.auth.service.AuthService;
+import com.coderGtm.delta.common.web.ApiPaths;
 import com.coderGtm.delta.user.User;
 
 import jakarta.validation.Valid;
@@ -23,7 +24,7 @@ import lombok.RequiredArgsConstructor;
  * Exposes authentication and token lifecycle endpoints.
  */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping(ApiPaths.AUTH)
 @RequiredArgsConstructor
 @Validated
 public class AuthController {

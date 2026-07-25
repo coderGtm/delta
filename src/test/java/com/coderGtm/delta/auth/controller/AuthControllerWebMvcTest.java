@@ -67,7 +67,7 @@ class AuthControllerWebMvcTest {
 			Instant.parse("2024-01-02T00:00:00Z")
 		));
 
-		mockMvc.perform(post("/auth/login")
+		mockMvc.perform(post("/api/v1/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -85,7 +85,7 @@ class AuthControllerWebMvcTest {
 		when(authService.refresh(any(RefreshTokenRequest.class)))
 			.thenReturn(new RefreshTokenResponse("new-access-token", "new-refresh-token"));
 
-		mockMvc.perform(post("/auth/refresh")
+		mockMvc.perform(post("/api/v1/auth/refresh")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -99,7 +99,7 @@ class AuthControllerWebMvcTest {
 
 	@Test
 	void logoutReturnsNoContent() throws Exception {
-		mockMvc.perform(post("/auth/logout")
+		mockMvc.perform(post("/api/v1/auth/logout")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -125,7 +125,7 @@ class AuthControllerWebMvcTest {
 
 	@Test
 	void loginRejectsBlankFirebaseToken() throws Exception {
-		mockMvc.perform(post("/auth/login")
+		mockMvc.perform(post("/api/v1/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -139,7 +139,7 @@ class AuthControllerWebMvcTest {
 
 	@Test
 	void refreshRejectsBlankRefreshToken() throws Exception {
-		mockMvc.perform(post("/auth/refresh")
+		mockMvc.perform(post("/api/v1/auth/refresh")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -153,7 +153,7 @@ class AuthControllerWebMvcTest {
 
 	@Test
 	void logoutRejectsBlankRefreshToken() throws Exception {
-		mockMvc.perform(post("/auth/logout")
+		mockMvc.perform(post("/api/v1/auth/logout")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{
@@ -170,7 +170,7 @@ class AuthControllerWebMvcTest {
 		when(authService.refresh(any(RefreshTokenRequest.class)))
 			.thenThrow(new InvalidTokenException("Invalid refresh token"));
 
-		mockMvc.perform(post("/auth/refresh")
+		mockMvc.perform(post("/api/v1/auth/refresh")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{

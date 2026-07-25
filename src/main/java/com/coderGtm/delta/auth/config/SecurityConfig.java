@@ -9,6 +9,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.coderGtm.delta.auth.filter.JwtAuthenticationFilter;
+import com.coderGtm.delta.common.web.ApiPaths;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,7 +36,11 @@ public class SecurityConfig {
 			.csrf(csrf -> csrf.disable())
 			.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
-				.requestMatchers("/auth/login", "/auth/refresh", "/auth/logout").permitAll()
+				.requestMatchers(
+					ApiPaths.AUTH + "/login",
+					ApiPaths.AUTH + "/refresh",
+					ApiPaths.AUTH + "/logout"
+				).permitAll()
 				.anyRequest().authenticated()
 			)
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.coderGtm.delta.common.dto.PageResponse;
+import com.coderGtm.delta.common.web.ApiPaths;
 import com.coderGtm.delta.outlet.dto.CreateOutletRequest;
 import com.coderGtm.delta.outlet.dto.InviteOutletMemberRequest;
 import com.coderGtm.delta.outlet.dto.OutletMembershipResponse;
@@ -33,7 +34,7 @@ import lombok.RequiredArgsConstructor;
  * REST endpoints for outlet management and membership invitations.
  */
 @RestController
-@RequestMapping("/outlets")
+@RequestMapping(ApiPaths.OUTLETS)
 @RequiredArgsConstructor
 @Validated
 public class OutletController {

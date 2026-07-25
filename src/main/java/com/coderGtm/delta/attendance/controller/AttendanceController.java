@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.coderGtm.delta.attendance.dto.AttendanceEntryResponse;
 import com.coderGtm.delta.common.dto.PageResponse;
+import com.coderGtm.delta.common.web.ApiPaths;
 import com.coderGtm.delta.attendance.dto.CreateAttendanceEntryRequest;
 import com.coderGtm.delta.attendance.dto.ManageAttendanceEntryRequest;
 import com.coderGtm.delta.attendance.dto.UpdateAttendanceEntryRequest;
@@ -33,7 +34,7 @@ import lombok.RequiredArgsConstructor;
  * REST endpoints for outlet attendance management.
  */
 @RestController
-@RequestMapping("/outlets")
+@RequestMapping(ApiPaths.OUTLETS)
 @RequiredArgsConstructor
 @Validated
 public class AttendanceController {

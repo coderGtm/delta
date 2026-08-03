@@ -5,4 +5,7 @@ bin
 .vscode
 HELP.md
 *.log
+.env
+.env.*
+!.env.example
 firebase/service-account.json

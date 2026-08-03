@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -31,7 +32,7 @@ public class AuditService {
 	/**
 	 * Records a new audit event with request metadata when available.
 	 */
-	@Transactional
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void record(UUID actorUserId, String action, String entityType, UUID entityId, Map<String, Object> metadata) {
 		AuditEvent event = new AuditEvent();
 		event.setActorUserId(actorUserId);

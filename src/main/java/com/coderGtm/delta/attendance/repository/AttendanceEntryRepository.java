@@ -1,5 +1,7 @@
 package com.coderGtm.delta.attendance.repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,4 +25,12 @@ public interface AttendanceEntryRepository extends JpaRepository<AttendanceEntry
 
 	@EntityGraph(attributePaths = {"user", "outlet"})
 	Optional<AttendanceEntry> findDetailedByIdAndOutlet_Id(UUID id, UUID outletId);
+
+	@EntityGraph(attributePaths = {"user", "outlet"})
+	List<AttendanceEntry> findAllByOutlet_IdAndUser_IdAndEntryTimeGreaterThanEqualAndEntryTimeLessThanOrderByEntryTimeAsc(
+		UUID outletId,
+		UUID userId,
+		Instant startInclusive,
+		Instant endExclusive
+	);
 }

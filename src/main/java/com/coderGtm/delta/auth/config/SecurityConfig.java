@@ -52,16 +52,16 @@ public class SecurityConfig {
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 			.addFilterAfter(rateLimitingFilter, JwtAuthenticationFilter.class)
 			.build();
-}
+	}
 
-/**
- * Prevents the rate-limiting filter from also being registered as a container
- * filter outside Spring Security's authenticated filter chain.
- */
-@Bean
-public FilterRegistrationBean<RateLimitingFilter> rateLimitingFilterRegistration(RateLimitingFilter filter) {
-	FilterRegistrationBean<RateLimitingFilter> registration = new FilterRegistrationBean<>(filter);
-	registration.setEnabled(false);
-	return registration;
+	/**
+	 * Prevents the rate-limiting filter from also being registered as a container
+	 * filter outside Spring Security's authenticated filter chain.
+	 */
+	@Bean
+	public FilterRegistrationBean<RateLimitingFilter> rateLimitingFilterRegistration(RateLimitingFilter filter) {
+		FilterRegistrationBean<RateLimitingFilter> registration = new FilterRegistrationBean<>(filter);
+		registration.setEnabled(false);
+		return registration;
 	}
 }

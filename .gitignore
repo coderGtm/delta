@@ -36,5 +36,10 @@ out/
 ### VS Code ###
 .vscode/
 
+### Local environment / secrets ###
+.env
+.env.*
+!.env.example
+
 ### Firebase Service Account ###
 firebase/service-account.json

@@ -3,15 +3,15 @@ services:
     image: postgres:17
     container_name: delta-postgres
     environment:
-      POSTGRES_DB: delta
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-delta}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - delta-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d delta"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,12 +25,12 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATASOURCE_URL: jdbc:postgresql://postgres:5432/delta
-      DATASOURCE_USERNAME: postgres
-      DATASOURCE_PASSWORD: postgres
-      JWT_SECRET: replace-this-with-a-long-random-production-secret-at-least-32-bytes
+      DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-delta}
+      DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-replace-this-with-a-long-random-production-secret-at-least-32-bytes}
       FIREBASE_SERVICE_ACCOUNT_PATH: /app/firebase/service-account.json
-      JAVA_OPTS: -XX:MaxRAMPercentage=75.0
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
     ports:
       - "8080:8080"
     volumes:

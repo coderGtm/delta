@@ -26,6 +26,7 @@ dependencies {
 	implementation "org.springframework.boot:spring-boot-starter-security"
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'io.micrometer:micrometer-registry-prometheus'
+	implementation 'org.apache.poi:poi-ooxml:5.4.1'
 	implementation 'com.google.firebase:firebase-admin:9.9.0'
 	implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
 	compileOnly 'org.projectlombok:lombok'

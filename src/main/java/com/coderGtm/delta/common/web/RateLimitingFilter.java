@@ -53,7 +53,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 		new RateLimitPolicy("POST", ApiPaths.OUTLETS + "/*/attendance", 20, Duration.ofMinutes(1), KeyStrategy.USER_OR_IP),
 		new RateLimitPolicy("POST", ApiPaths.OUTLETS + "/*/attendance/manage", 60, Duration.ofMinutes(1), KeyStrategy.USER_OR_IP),
 		new RateLimitPolicy("PUT", ApiPaths.OUTLETS + "/*/attendance/*", 60, Duration.ofMinutes(1), KeyStrategy.USER_OR_IP),
-		new RateLimitPolicy("PUT", ApiPaths.OUTLETS + "/*/geofence", 20, Duration.ofMinutes(1), KeyStrategy.USER_OR_IP)
+		new RateLimitPolicy("PUT", ApiPaths.OUTLETS + "/*/geofence", 20, Duration.ofMinutes(1), KeyStrategy.USER_OR_IP),
+		new RateLimitPolicy("GET", ApiPaths.OUTLETS + "/*/reports/salary", 30, Duration.ofMinutes(1), KeyStrategy.USER_OR_IP),
+		new RateLimitPolicy("GET", ApiPaths.OUTLETS + "/*/reports/salary.xlsx", 10, Duration.ofMinutes(1), KeyStrategy.USER_OR_IP)
 	);
 
 	@Override

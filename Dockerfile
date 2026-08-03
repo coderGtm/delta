@@ -6,6 +6,10 @@ COPY gradlew settings.gradle build.gradle ./
 COPY gradle ./gradle
 RUN chmod +x gradlew
 
+# Download and cache the Gradle distribution before copying source files so
+# normal source changes do not force the wrapper download layer to rerun.
+RUN ./gradlew --version --no-daemon
+
 COPY src ./src
 RUN ./gradlew bootJar --no-daemon
 

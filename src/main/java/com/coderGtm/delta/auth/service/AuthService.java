@@ -1,5 +1,7 @@
 package com.coderGtm.delta.auth.service;
 
+import java.util.Map;
+
 import org.springframework.stereotype.Service;
 
 import com.coderGtm.delta.auth.dto.FirebaseUserInfo;
@@ -9,7 +11,9 @@ import com.coderGtm.delta.auth.dto.LogoutRequest;
 import com.coderGtm.delta.auth.dto.RefreshTokenRequest;
 import com.coderGtm.delta.auth.dto.RefreshTokenResponse;
 import com.coderGtm.delta.auth.mapper.AuthMapper;
+import com.coderGtm.delta.common.audit.service.AuditService;
 import com.coderGtm.delta.common.exception.InvalidTokenException;
+import com.coderGtm.delta.common.metrics.ApplicationMetrics;
 import com.coderGtm.delta.user.User;
 import com.coderGtm.delta.user.UserRepository;
 import com.coderGtm.delta.user.UserService;
@@ -30,6 +34,8 @@ public class AuthService {
 	private final JwtService jwtService;
 	private final RefreshTokenService refreshTokenService;
 	private final AuthMapper authMapper;
+	private final AuditService auditService;
+	private final ApplicationMetrics applicationMetrics;
 
 	/**
 	 * Verifies a Firebase ID token, creates the local user when needed, and
@@ -56,6 +62,9 @@ public class AuthService {
 		String accessToken = jwtService.generateAccessToken(user);
 		RefreshTokenService.IssuedRefreshToken issuedRefreshToken = refreshTokenService.create(user);
 
+		applicationMetrics.increment("auth.login.success");
+		auditService.record(user.getId(), "AUTH_LOGIN", "USER", user.getId(), Map.of("email", user.getEmail()));
+
 		return authMapper.toResponse(user, accessToken, issuedRefreshToken.refreshToken());
 	}
 
@@ -66,6 +75,9 @@ public class AuthService {
 		RefreshTokenService.IssuedRefreshToken rotatedToken = refreshTokenService.rotate(request.refreshToken());
 		String accessToken = jwtService.generateAccessToken(rotatedToken.user());
 
+		applicationMetrics.increment("auth.refresh.success");
+		auditService.record(rotatedToken.user().getId(), "AUTH_REFRESH", "USER", rotatedToken.user().getId(), Map.of());
+
 		return new RefreshTokenResponse(accessToken, rotatedToken.refreshToken());
 	}
 
@@ -74,6 +86,7 @@ public class AuthService {
 	 */
 	public void logout(LogoutRequest request) {
 		refreshTokenService.revoke(request.refreshToken());
+		applicationMetrics.increment("auth.logout.success");
 	}
 
 	/**
@@ -81,5 +94,7 @@ public class AuthService {
 	 */
 	public void logoutAll(User user) {
 		refreshTokenService.revokeAllForUser(user);
+		applicationMetrics.increment("auth.logout_all.success");
+		auditService.record(user.getId(), "AUTH_LOGOUT_ALL", "USER", user.getId(), Map.of());
 	}
 }

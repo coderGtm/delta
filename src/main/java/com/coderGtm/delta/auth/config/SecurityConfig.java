@@ -1,5 +1,6 @@
 package com.coderGtm.delta.auth.config;
 
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -10,6 +11,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import com.coderGtm.delta.auth.filter.JwtAuthenticationFilter;
 import com.coderGtm.delta.common.web.ApiPaths;
+import com.coderGtm.delta.common.web.RateLimitingFilter;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
 
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
+	private final RateLimitingFilter rateLimitingFilter;
 
 	/**
 	 * Builds the application's security filter chain.
@@ -37,6 +40,9 @@ public class SecurityConfig {
 			.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers(
+					"/actuator/health",
+					"/actuator/health/**",
+					"/actuator/info",
 					ApiPaths.AUTH + "/login",
 					ApiPaths.AUTH + "/refresh",
 					ApiPaths.AUTH + "/logout"
@@ -44,6 +50,18 @@ public class SecurityConfig {
 				.anyRequest().authenticated()
 			)
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+			.addFilterAfter(rateLimitingFilter, JwtAuthenticationFilter.class)
 			.build();
+}
+
+/**
+ * Prevents the rate-limiting filter from also being registered as a container
+ * filter outside Spring Security's authenticated filter chain.
+ */
+@Bean
+public FilterRegistrationBean<RateLimitingFilter> rateLimitingFilterRegistration(RateLimitingFilter filter) {
+	FilterRegistrationBean<RateLimitingFilter> registration = new FilterRegistrationBean<>(filter);
+	registration.setEnabled(false);
+	return registration;
 	}
 }

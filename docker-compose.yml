@@ -8,3 +8,39 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
+    volumes:
+      - delta-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d delta"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: delta-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATASOURCE_URL: jdbc:postgresql://postgres:5432/delta
+      DATASOURCE_USERNAME: postgres
+      DATASOURCE_PASSWORD: postgres
+      JWT_SECRET: replace-this-with-a-long-random-production-secret-at-least-32-bytes
+      FIREBASE_SERVICE_ACCOUNT_PATH: /app/firebase/service-account.json
+      JAVA_OPTS: -XX:MaxRAMPercentage=75.0
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./firebase:/app/firebase:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+volumes:
+  delta-postgres-data:

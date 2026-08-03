@@ -2,6 +2,7 @@ package com.coderGtm.delta.attendance.service;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -17,10 +18,13 @@ import com.coderGtm.delta.attendance.dto.UpdateAttendanceEntryRequest;
 import com.coderGtm.delta.attendance.entity.AttendanceEntry;
 import com.coderGtm.delta.attendance.mapper.AttendanceMapper;
 import com.coderGtm.delta.attendance.repository.AttendanceEntryRepository;
+import com.coderGtm.delta.common.audit.service.AuditService;
 import com.coderGtm.delta.common.dto.PageResponse;
 import com.coderGtm.delta.common.exception.BadRequestException;
 import com.coderGtm.delta.common.exception.ForbiddenException;
 import com.coderGtm.delta.common.exception.ResourceNotFoundException;
+import com.coderGtm.delta.common.metrics.ApplicationMetrics;
+import com.coderGtm.delta.common.util.GeoUtils;
 import com.coderGtm.delta.common.util.PaginationUtils;
 import com.coderGtm.delta.outlet.entity.OutletMembership;
 import com.coderGtm.delta.outlet.entity.OutletMembershipStatus;
@@ -45,6 +49,8 @@ public class AttendanceService {
 	private final OutletMembershipRepository outletMembershipRepository;
 	private final AttendanceMapper attendanceMapper;
 	private final Clock clock;
+	private final AuditService auditService;
+	private final ApplicationMetrics applicationMetrics;
 
 	/**
 	 * Creates a new attendance entry for the authenticated employee using the
@@ -58,6 +64,8 @@ public class AttendanceService {
 			throw new ForbiddenException("Only accepted employees can create their own attendance entries");
 		}
 
+		validateGeofenceIfEnabled(currentMembership.getOutlet(), request.latitude(), request.longitude());
+
 		AttendanceEntry entry = new AttendanceEntry();
 		entry.setUser(currentMembership.getUser());
 		entry.setOutlet(currentMembership.getOutlet());
@@ -66,7 +74,16 @@ public class AttendanceService {
 		entry.setLatitude(request.latitude());
 		entry.setLongitude(request.longitude());
 
-		return attendanceMapper.toResponse(attendanceEntryRepository.save(entry));
+		AttendanceEntry savedEntry = attendanceEntryRepository.save(entry);
+		applicationMetrics.increment("attendance.created", "mode", "self");
+		auditService.record(
+			currentUserId,
+			"ATTENDANCE_CREATED",
+			"ATTENDANCE_ENTRY",
+			savedEntry.getId(),
+			Map.of("outletId", outletId, "userId", currentUserId, "type", savedEntry.getType().name(), "mode", "self")
+		);
+		return attendanceMapper.toResponse(savedEntry);
 	}
 
 	/**
@@ -88,6 +105,8 @@ public class AttendanceService {
 			throw new BadRequestException("Attendance can only be created for accepted employee memberships");
 		}
 
+		validateGeofenceIfEnabled(targetMembership.getOutlet(), request.latitude(), request.longitude());
+
 		AttendanceEntry entry = new AttendanceEntry();
 		entry.setUser(targetMembership.getUser());
 		entry.setOutlet(targetMembership.getOutlet());
@@ -96,7 +115,16 @@ public class AttendanceService {
 		entry.setLatitude(request.latitude());
 		entry.setLongitude(request.longitude());
 
-		return attendanceMapper.toResponse(attendanceEntryRepository.save(entry));
+		AttendanceEntry savedEntry = attendanceEntryRepository.save(entry);
+		applicationMetrics.increment("attendance.created", "mode", "managed");
+		auditService.record(
+			currentUserId,
+			"ATTENDANCE_CREATED",
+			"ATTENDANCE_ENTRY",
+			savedEntry.getId(),
+			Map.of("outletId", outletId, "userId", request.userId(), "type", savedEntry.getType().name(), "mode", "managed")
+		);
+		return attendanceMapper.toResponse(savedEntry);
 	}
 
 	/**
@@ -168,12 +196,22 @@ public class AttendanceService {
 		assertOwner(currentMembership);
 
 		AttendanceEntry entry = getAttendanceEntryOrThrow(outletId, attendanceEntryId);
+		validateGeofenceIfEnabled(entry.getOutlet(), request.latitude(), request.longitude());
 		entry.setType(request.type());
 		entry.setEntryTime(request.entryTime());
 		entry.setLatitude(request.latitude());
 		entry.setLongitude(request.longitude());
 
-		return attendanceMapper.toResponse(attendanceEntryRepository.save(entry));
+		AttendanceEntry savedEntry = attendanceEntryRepository.save(entry);
+		applicationMetrics.increment("attendance.updated");
+		auditService.record(
+			currentUserId,
+			"ATTENDANCE_UPDATED",
+			"ATTENDANCE_ENTRY",
+			attendanceEntryId,
+			Map.of("outletId", outletId, "userId", savedEntry.getUser().getId(), "type", savedEntry.getType().name())
+		);
+		return attendanceMapper.toResponse(savedEntry);
 	}
 
 	/**
@@ -186,6 +224,14 @@ public class AttendanceService {
 		assertOwner(currentMembership);
 		AttendanceEntry entry = getAttendanceEntryOrThrow(outletId, attendanceEntryId);
 		attendanceEntryRepository.delete(entry);
+		applicationMetrics.increment("attendance.deleted");
+		auditService.record(
+			currentUserId,
+			"ATTENDANCE_DELETED",
+			"ATTENDANCE_ENTRY",
+			attendanceEntryId,
+			Map.of("outletId", outletId, "userId", entry.getUser().getId(), "type", entry.getType().name())
+		);
 	}
 
 	private OutletMembership assertAcceptedCurrentMembership(UUID outletId, UUID currentUserId) {
@@ -216,5 +262,28 @@ public class AttendanceService {
 	private AttendanceEntry getAttendanceEntryOrThrow(UUID outletId, UUID attendanceEntryId) {
 		return attendanceEntryRepository.findDetailedByIdAndOutlet_Id(attendanceEntryId, outletId)
 			.orElseThrow(() -> new ResourceNotFoundException("Attendance entry not found: " + attendanceEntryId));
+	}
+
+	private void validateGeofenceIfEnabled(
+		com.coderGtm.delta.outlet.entity.Outlet outlet,
+		java.math.BigDecimal latitude,
+		java.math.BigDecimal longitude
+	) {
+		if (!outlet.isGeofenceEnabled()) {
+			return;
+		}
+
+		boolean withinRadius = GeoUtils.isWithinRadiusMeters(
+			outlet.getLatitude(),
+			outlet.getLongitude(),
+			latitude,
+			longitude,
+			outlet.getRadiusMeters()
+		);
+
+		if (!withinRadius) {
+			applicationMetrics.increment("attendance.geofence.rejected", "outletId", outlet.getId().toString());
+			throw new ForbiddenException("Attendance location is outside the outlet geofence");
+		}
 	}
 }

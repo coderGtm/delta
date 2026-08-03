@@ -24,6 +24,7 @@ public class OutletMapper {
 			outlet.getLatitude(),
 			outlet.getLongitude(),
 			outlet.getRadiusMeters(),
+			outlet.isGeofenceEnabled(),
 			outlet.getCreatedAt(),
 			outlet.getUpdatedAt()
 		);

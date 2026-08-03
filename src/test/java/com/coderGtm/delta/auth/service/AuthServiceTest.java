@@ -25,7 +25,9 @@ import com.coderGtm.delta.auth.dto.LogoutRequest;
 import com.coderGtm.delta.auth.dto.RefreshTokenRequest;
 import com.coderGtm.delta.auth.dto.RefreshTokenResponse;
 import com.coderGtm.delta.auth.mapper.AuthMapper;
+import com.coderGtm.delta.common.audit.service.AuditService;
 import com.coderGtm.delta.common.exception.InvalidTokenException;
+import com.coderGtm.delta.common.metrics.ApplicationMetrics;
 import com.coderGtm.delta.user.User;
 import com.coderGtm.delta.user.UserRepository;
 import com.coderGtm.delta.user.UserService;
@@ -52,6 +54,12 @@ class AuthServiceTest {
 	@Mock
 	private AuthMapper authMapper;
 
+	@Mock
+	private AuditService auditService;
+
+	@Mock
+	private ApplicationMetrics applicationMetrics;
+
 	private AuthService authService;
 
 	@BeforeEach
@@ -62,7 +70,9 @@ class AuthServiceTest {
 			userService,
 			jwtService,
 			refreshTokenService,
-			authMapper
+			authMapper,
+		auditService,
+		applicationMetrics
 		);
 	}
 

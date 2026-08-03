@@ -47,4 +47,11 @@ public class Outlet extends BaseEntity {
 
 	@Column(nullable = false)
 	private Integer radiusMeters;
+
+	/**
+	 * Controls whether attendance write requests must originate within the
+	 * outlet's configured geofence.
+	 */
+	@Column(nullable = false)
+	private boolean geofenceEnabled;
 }

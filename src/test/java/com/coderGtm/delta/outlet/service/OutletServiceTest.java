@@ -20,14 +20,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.coderGtm.delta.common.audit.service.AuditService;
 import com.coderGtm.delta.common.dto.PageResponse;
 import com.coderGtm.delta.common.exception.BadRequestException;
+import com.coderGtm.delta.common.metrics.ApplicationMetrics;
 import com.coderGtm.delta.common.exception.ConflictException;
 import com.coderGtm.delta.common.exception.ForbiddenException;
 import com.coderGtm.delta.outlet.dto.CreateOutletRequest;
 import com.coderGtm.delta.outlet.dto.InviteOutletMemberRequest;
 import com.coderGtm.delta.outlet.dto.OutletMembershipResponse;
 import com.coderGtm.delta.outlet.dto.OutletResponse;
+import com.coderGtm.delta.outlet.dto.UpdateOutletGeofenceRequest;
 import com.coderGtm.delta.outlet.dto.UpdateOutletRequest;
 import com.coderGtm.delta.outlet.entity.Outlet;
 import com.coderGtm.delta.outlet.entity.OutletMembership;
@@ -51,6 +54,12 @@ class OutletServiceTest {
 	@Mock
 	private UserRepository userRepository;
 
+	@Mock
+	private AuditService auditService;
+
+	@Mock
+	private ApplicationMetrics applicationMetrics;
+
 	private OutletService outletService;
 
 	@BeforeEach
@@ -59,7 +68,9 @@ class OutletServiceTest {
 			outletRepository,
 			outletMembershipRepository,
 			userRepository,
-			new OutletMapper()
+			new OutletMapper(),
+			auditService,
+			applicationMetrics
 		);
 	}
 
@@ -103,6 +114,29 @@ class OutletServiceTest {
 		assertThat(response.name()).isEqualTo("Updated Outlet");
 		assertThat(response.latitude()).isEqualByComparingTo("28.6139000");
 		assertThat(response.radiusMeters()).isEqualTo(250);
+	}
+
+	@Test
+	void updateOutletGeofenceAllowsAcceptedOwnerToToggleEnforcement() {
+		UUID outletId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
+		User owner = user(ownerId, "owner@example.com", "Owner");
+		Outlet outlet = outlet(outletId, "Outlet A");
+		OutletMembership ownerMembership = membership(UUID.randomUUID(), outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+
+		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
+			.thenReturn(Optional.of(ownerMembership));
+		when(outletRepository.findById(outletId)).thenReturn(Optional.of(outlet));
+		when(outletRepository.save(outlet)).thenReturn(outlet);
+
+		OutletResponse response = outletService.updateOutletGeofence(
+			ownerId,
+			outletId,
+			new UpdateOutletGeofenceRequest(true)
+		);
+
+		assertThat(response.geofenceEnabled()).isTrue();
+		assertThat(outlet.isGeofenceEnabled()).isTrue();
 	}
 
 	@Test

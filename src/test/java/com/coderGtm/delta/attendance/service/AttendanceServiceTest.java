@@ -32,8 +32,10 @@ import com.coderGtm.delta.attendance.entity.AttendanceEntry;
 import com.coderGtm.delta.attendance.entity.AttendanceEntryType;
 import com.coderGtm.delta.attendance.mapper.AttendanceMapper;
 import com.coderGtm.delta.attendance.repository.AttendanceEntryRepository;
+import com.coderGtm.delta.common.audit.service.AuditService;
 import com.coderGtm.delta.common.dto.PageResponse;
 import com.coderGtm.delta.common.exception.BadRequestException;
+import com.coderGtm.delta.common.metrics.ApplicationMetrics;
 import com.coderGtm.delta.common.exception.ForbiddenException;
 import com.coderGtm.delta.outlet.entity.Outlet;
 import com.coderGtm.delta.outlet.entity.OutletMembership;
@@ -53,6 +55,12 @@ class AttendanceServiceTest {
 	@Mock
 	private OutletMembershipRepository outletMembershipRepository;
 
+	@Mock
+	private AuditService auditService;
+
+	@Mock
+	private ApplicationMetrics applicationMetrics;
+
 	private AttendanceService attendanceService;
 
 	@BeforeEach
@@ -61,7 +69,9 @@ class AttendanceServiceTest {
 			attendanceEntryRepository,
 			outletMembershipRepository,
 			new AttendanceMapper(),
-			Clock.fixed(FIXED_NOW, ZoneOffset.UTC)
+			Clock.fixed(FIXED_NOW, ZoneOffset.UTC),
+			auditService,
+			applicationMetrics
 		);
 	}
 
@@ -134,6 +144,37 @@ class AttendanceServiceTest {
 		))
 			.isInstanceOf(ForbiddenException.class)
 			.hasMessage("Only accepted employees can create their own attendance entries");
+	}
+
+	@Test
+	void createOwnEntryRejectsOutsideGeofenceWhenEnabled() {
+		UUID outletId = UUID.randomUUID();
+		UUID employeeId = UUID.randomUUID();
+		User employee = user(employeeId, "employee@example.com", "Employee");
+		Outlet outlet = outlet(outletId, "Outlet A");
+		outlet.setGeofenceEnabled(true);
+		OutletMembership membership = membership(
+			UUID.randomUUID(),
+			outlet,
+			employee,
+			OutletRole.EMPLOYEE,
+			OutletMembershipStatus.ACCEPTED
+		);
+
+		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, employeeId))
+			.thenReturn(Optional.of(membership));
+
+		assertThatThrownBy(() -> attendanceService.createOwnEntry(
+			employeeId,
+			outletId,
+			new CreateAttendanceEntryRequest(
+				AttendanceEntryType.CLOCK_IN,
+				new BigDecimal("13.0352000"),
+				new BigDecimal("77.5970000")
+			)
+		))
+			.isInstanceOf(ForbiddenException.class)
+			.hasMessage("Attendance location is outside the outlet geofence");
 	}
 
 	@Test

@@ -23,6 +23,7 @@ import com.coderGtm.delta.outlet.dto.CreateOutletRequest;
 import com.coderGtm.delta.outlet.dto.InviteOutletMemberRequest;
 import com.coderGtm.delta.outlet.dto.OutletMembershipResponse;
 import com.coderGtm.delta.outlet.dto.OutletResponse;
+import com.coderGtm.delta.outlet.dto.UpdateOutletGeofenceRequest;
 import com.coderGtm.delta.outlet.dto.UpdateOutletRequest;
 import com.coderGtm.delta.outlet.service.OutletService;
 import com.coderGtm.delta.user.User;
@@ -74,6 +75,19 @@ public class OutletController {
 		@Valid @RequestBody UpdateOutletRequest request
 	) {
 		return ResponseEntity.ok(outletService.updateOutlet(currentUser.getId(), outletId, request));
+	}
+
+	/**
+	 * Toggles attendance geofence enforcement for an outlet. Only accepted outlet
+	 * owners may perform this action.
+	 */
+	@PutMapping("/{outletId}/geofence")
+	public ResponseEntity<OutletResponse> updateOutletGeofence(
+		@AuthenticationPrincipal User currentUser,
+		@PathVariable UUID outletId,
+		@Valid @RequestBody UpdateOutletGeofenceRequest request
+	) {
+		return ResponseEntity.ok(outletService.updateOutletGeofence(currentUser.getId(), outletId, request));
 	}
 
 	/**

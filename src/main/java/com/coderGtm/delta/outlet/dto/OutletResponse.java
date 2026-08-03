@@ -13,6 +13,7 @@ public record OutletResponse(
 	BigDecimal latitude,
 	BigDecimal longitude,
 	Integer radiusMeters,
+	boolean geofenceEnabled,
 	Instant createdAt,
 	Instant updatedAt
 ) {

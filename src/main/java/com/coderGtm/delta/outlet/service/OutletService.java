@@ -1,6 +1,7 @@
 package com.coderGtm.delta.outlet.service;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -10,16 +11,19 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.coderGtm.delta.common.audit.service.AuditService;
 import com.coderGtm.delta.common.dto.PageResponse;
 import com.coderGtm.delta.common.exception.BadRequestException;
 import com.coderGtm.delta.common.exception.ConflictException;
 import com.coderGtm.delta.common.exception.ForbiddenException;
 import com.coderGtm.delta.common.exception.ResourceNotFoundException;
+import com.coderGtm.delta.common.metrics.ApplicationMetrics;
 import com.coderGtm.delta.common.util.PaginationUtils;
 import com.coderGtm.delta.outlet.dto.CreateOutletRequest;
 import com.coderGtm.delta.outlet.dto.InviteOutletMemberRequest;
 import com.coderGtm.delta.outlet.dto.OutletMembershipResponse;
 import com.coderGtm.delta.outlet.dto.OutletResponse;
+import com.coderGtm.delta.outlet.dto.UpdateOutletGeofenceRequest;
 import com.coderGtm.delta.outlet.dto.UpdateOutletRequest;
 import com.coderGtm.delta.outlet.entity.Outlet;
 import com.coderGtm.delta.outlet.entity.OutletMembership;
@@ -48,6 +52,8 @@ public class OutletService {
 	private final OutletMembershipRepository outletMembershipRepository;
 	private final UserRepository userRepository;
 	private final OutletMapper outletMapper;
+	private final AuditService auditService;
+	private final ApplicationMetrics applicationMetrics;
 
 	/**
 	 * Creates a new outlet and immediately assigns the creator as an accepted
@@ -62,6 +68,7 @@ public class OutletService {
 		outlet.setLatitude(request.latitude());
 		outlet.setLongitude(request.longitude());
 		outlet.setRadiusMeters(request.radiusMeters());
+		outlet.setGeofenceEnabled(false);
 
 		Outlet savedOutlet = outletRepository.save(outlet);
 
@@ -72,6 +79,14 @@ public class OutletService {
 		ownerMembership.setStatus(OutletMembershipStatus.ACCEPTED);
 		ownerMembership.setInvitedBy(null);
 		outletMembershipRepository.save(ownerMembership);
+		applicationMetrics.increment("outlet.created");
+		auditService.record(
+			currentUser.getId(),
+			"OUTLET_CREATED",
+			"OUTLET",
+			savedOutlet.getId(),
+			Map.of("name", savedOutlet.getName())
+		);
 
 		return outletMapper.toOutletResponse(savedOutlet);
 	}
@@ -102,7 +117,34 @@ public class OutletService {
 		outlet.setLongitude(request.longitude());
 		outlet.setRadiusMeters(request.radiusMeters());
 
-		return outletMapper.toOutletResponse(outletRepository.save(outlet));
+		Outlet savedOutlet = outletRepository.save(outlet);
+		applicationMetrics.increment("outlet.updated");
+		auditService.record(currentUserId, "OUTLET_UPDATED", "OUTLET", outletId, Map.of("name", savedOutlet.getName()));
+		return outletMapper.toOutletResponse(savedOutlet);
+	}
+
+	/**
+	 * Toggles attendance geofence enforcement for an outlet. Only accepted outlet
+	 * owners may perform this action.
+	 */
+	@Transactional
+	public OutletResponse updateOutletGeofence(UUID currentUserId, UUID outletId, UpdateOutletGeofenceRequest request) {
+		assertAcceptedOwner(outletId, currentUserId);
+
+		Outlet outlet = outletRepository.findById(outletId)
+			.orElseThrow(() -> new ResourceNotFoundException("Outlet not found: " + outletId));
+
+		outlet.setGeofenceEnabled(Boolean.TRUE.equals(request.geofenceEnabled()));
+		Outlet savedOutlet = outletRepository.save(outlet);
+		applicationMetrics.increment("outlet.geofence.updated", "enabled", String.valueOf(savedOutlet.isGeofenceEnabled()));
+		auditService.record(
+			currentUserId,
+			"OUTLET_GEOFENCE_UPDATED",
+			"OUTLET",
+			outletId,
+			Map.of("geofenceEnabled", savedOutlet.isGeofenceEnabled())
+		);
+		return outletMapper.toOutletResponse(savedOutlet);
 	}
 
 	/**
@@ -180,6 +222,7 @@ public class OutletService {
 
 			try {
 				OutletMembership savedMembership = outletMembershipRepository.save(existingMembership);
+				recordMemberInvited(inviter, savedMembership);
 				return outletMapper.toMembershipResponse(getMembershipDetails(savedMembership.getId()));
 			} catch (DataIntegrityViolationException ex) {
 				throw new ConflictException("User already has a membership record for this outlet");
@@ -200,6 +243,7 @@ public class OutletService {
 
 		try {
 			OutletMembership savedMembership = outletMembershipRepository.save(membership);
+			recordMemberInvited(inviter, savedMembership);
 			return outletMapper.toMembershipResponse(getMembershipDetails(savedMembership.getId()));
 		} catch (DataIntegrityViolationException ex) {
 			throw new ConflictException("User already has a membership record for this outlet");
@@ -219,7 +263,16 @@ public class OutletService {
 		}
 
 		membership.setStatus(OutletMembershipStatus.ACCEPTED);
-		return outletMapper.toMembershipResponse(outletMembershipRepository.save(membership));
+		OutletMembership savedMembership = outletMembershipRepository.save(membership);
+		applicationMetrics.increment("outlet.membership.accepted");
+		auditService.record(
+			currentUserId,
+			"OUTLET_INVITE_ACCEPTED",
+			"OUTLET_MEMBERSHIP",
+			membershipId,
+			Map.of("outletId", savedMembership.getOutlet().getId())
+		);
+		return outletMapper.toMembershipResponse(savedMembership);
 	}
 
 	/**
@@ -235,7 +288,16 @@ public class OutletService {
 		}
 
 		membership.setStatus(OutletMembershipStatus.REJECTED);
-		return outletMapper.toMembershipResponse(outletMembershipRepository.save(membership));
+		OutletMembership savedMembership = outletMembershipRepository.save(membership);
+		applicationMetrics.increment("outlet.membership.rejected");
+		auditService.record(
+			currentUserId,
+			"OUTLET_INVITE_REJECTED",
+			"OUTLET_MEMBERSHIP",
+			membershipId,
+			Map.of("outletId", savedMembership.getOutlet().getId())
+		);
+		return outletMapper.toMembershipResponse(savedMembership);
 	}
 
 	/**
@@ -259,6 +321,25 @@ public class OutletService {
 		membership.setRemovedAt(Instant.now());
 		membership.setRemovedBy(owner);
 		outletMembershipRepository.save(membership);
+		applicationMetrics.increment("outlet.membership.removed");
+		auditService.record(
+			currentUserId,
+			"OUTLET_MEMBERSHIP_REMOVED",
+			"OUTLET_MEMBERSHIP",
+			membershipId,
+			Map.of("outletId", outletId, "removedUserId", membership.getUser().getId())
+		);
+	}
+
+	private void recordMemberInvited(User inviter, OutletMembership membership) {
+		applicationMetrics.increment("outlet.membership.invited");
+		auditService.record(
+			inviter.getId(),
+			"OUTLET_MEMBER_INVITED",
+			"OUTLET_MEMBERSHIP",
+			membership.getId(),
+			Map.of("outletId", membership.getOutlet().getId(), "inviteeUserId", membership.getUser().getId())
+		);
 	}
 
 	private User getActiveUser(UUID userId) {

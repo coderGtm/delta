@@ -21,6 +21,8 @@ import org.springframework.util.AntPathMatcher;
 import com.coderGtm.delta.common.dto.ErrorResponse;
 import com.coderGtm.delta.user.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -40,7 +42,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RateLimitingFilter extends OncePerRequestFilter {
 
-	private final ObjectMapper objectMapper = new ObjectMapper();
+	// This app serializes errors with the Jackson 2 ObjectMapper (Spring Boot 4's
+	// managed mapper is Jackson 3 and is not an instance of this type), so the
+	// jsr310 module is registered here to support the ErrorResponse timestamp.
+	private final ObjectMapper objectMapper = JsonMapper.builder().addModule(new JavaTimeModule()).build();
 	private final AntPathMatcher pathMatcher = new AntPathMatcher();
 	private final Map<String, WindowCounter> counters = new ConcurrentHashMap<>();
 

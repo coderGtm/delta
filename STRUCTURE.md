@@ -233,6 +233,13 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 .env.example
+loadtest
+ ├── seed.sh
+ ├── seed.sql
+ ├── config.js
+ ├── smoke.js
+ ├── capacity.js
+ └── rate-limit.js
 monitoring
  ├── prometheus
  │    ├── prometheus.yml
@@ -252,3 +259,4 @@ Notes:
 - Multi-stage Docker build creates the Spring Boot jar inside a builder image.
 - Runtime container runs as a non-root user.
 - Compose starts Postgres and the app container.
+- `loadtest/` holds k6 scripts that mint local JWTs to test authenticated endpoints without Firebase; see SETUP.md "Load and rate limit testing".

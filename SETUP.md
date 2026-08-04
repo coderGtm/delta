@@ -293,6 +293,89 @@ For JWT, generate a long random value and inject it as:
 JWT_SECRET=<secret>
 ```
 
+## Load and rate limit testing
+
+Quick load and rate-limit tests are available under `loadtest/` and run with [k6](https://k6.io) from your machine. They generate real HTTP load through the full stack (Security chain, JWT filter, rate-limiting filter, Hikari, Postgres).
+
+The scripts mint local HS256 access tokens with the same `JWT_SECRET` the app uses, so authenticated endpoints are tested without hitting Firebase or the login rate limit.
+
+### Prerequisites
+
+- The docker compose stack is running (`docker compose up --build`).
+- `k6` is installed locally (`brew install k6` or from the k6 website).
+- The app's `JWT_SECRET` matches `loadtest/config.js` (compose default does).
+
+### Seed test data
+
+```bash
+./loadtest/seed.sh
+```
+
+This inserts 5 users, 1 outlet with accepted memberships, and 160 attendance entries into the running `delta-postgres` container. Idempotent, safe to re-run.
+
+### Smoke test
+
+Sanity check that auth and the seeded data work:
+
+```bash
+k6 run loadtest/smoke.js
+```
+
+### Capacity test
+
+Ramps 1 → 60 VUs against `GET /outlets/{id}/attendance` (deliberately chosen because it is not rate-limited, so the numbers reflect app + JVM + connection pool + DB capacity):
+
+```bash
+k6 run loadtest/capacity.js
+```
+
+Raise the ceiling with:
+
+```bash
+k6 run -e MAX_VUS=100 loadtest/capacity.js
+```
+
+The summary reports requests/sec, latency percentiles, and error rate. Watch memory during the run with:
+
+```bash
+docker stats delta-app
+```
+
+For a real-world baseline run this against your production-like hardware and Postgres, not the local laptop.
+
+### Rate limit tests
+
+Verifies the 429 boundaries from `RateLimitingFilter` (`loadtest/rate-limit.js`):
+
+- `POST /api/v1/auth/login` → 10/min per IP
+- `POST /api/v1/auth/refresh` → 30/min per IP
+- `POST /api/v1/outlets/{id}/attendance` → 20/min per user
+- Per-IP isolation via `X-Forwarded-For`
+
+```bash
+k6 run loadtest/rate-limit.js
+```
+
+Note: the app's rate-limit counters are in-memory and reset after 1 minute, so wait at least a minute between runs against the same app instance.
+
+### Configuration
+
+All scripts read the same env vars (defaults in `loadtest/config.js`):
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `BASE_URL` | `http://localhost:8080` | App base URL |
+| `JWT_SECRET` | compose default | Secret used to mint local access tokens |
+| `OUTLET_ID` | seeded outlet | Outlet used in tests |
+| `OWNER_ID` | seeded owner | Owner user id for read endpoints |
+| `EMPLOYEE_IDS` | seeded employees | Employee user ids for write endpoints |
+| `MAX_VUS` | `60` | Capacity test peak virtual users |
+
+### Interpreting results
+
+- The unthrottled read endpoint sustains thousands of requests/sec on a local machine, so the app is typically not the bottleneck for small deployments — Postgres connection pool size and the heaviest endpoints (salary `.xlsx` export, attendance writes) matter more.
+- Writes are intentionally capped by rate limits (e.g. 20 attendance entries/min/user), so those endpoints are bottlenecked by policy, not capacity.
+
 ## Report generation
 
 Salary report endpoints:

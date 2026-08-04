@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: delta-api
+    metrics_path: /actuator/prometheus
+    scheme: http
+    bearer_token_file: /etc/prometheus/secrets/prometheus-token.txt
+    static_configs:
+      - targets:
+          - app:8080

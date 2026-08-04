@@ -58,10 +58,32 @@ firebase/service-account.json
 
 This file is ignored by Git.
 
+Before starting the stack, keep the Prometheus scrape token in sync:
+
+```bash
+cp monitoring/prometheus/prometheus-token.example.txt monitoring/prometheus/prometheus-token.txt
+# edit .env PROMETHEUS_BEARER_TOKEN and monitoring/prometheus/prometheus-token.txt to the same value
+```
+
 Start the stack:
 
 ```bash
 docker compose up --build
+```
+
+Services:
+
+| Service | URL |
+| --- | --- |
+| App | http://localhost:8080 |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 |
+
+Default local Grafana credentials come from `.env`:
+
+```text
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=admin
 ```
 
 Stop the stack:
@@ -75,6 +97,26 @@ Stop and remove the Postgres volume:
 ```bash
 docker compose down -v
 ```
+
+## API docs
+
+API docs are generated at runtime from controllers and DTOs using `springdoc-openapi`, so they always reflect the current API.
+
+Interactive Swagger UI is available at:
+
+```text
+http://localhost:8080/docs
+```
+
+The OpenAPI spec is available at:
+
+```text
+http://localhost:8080/docs/openapi.yaml
+```
+
+The JSON variant is served at `/docs/openapi`.
+
+Use this while building the Android app to inspect request/response models, auth requirements, and report query parameters.
 
 ## API base URL
 
@@ -132,12 +174,48 @@ curl http://localhost:8080/actuator/info
 
 ## Metrics and monitoring
 
+### Local Grafana dashboard
+
+When running Docker Compose, open:
+
+```text
+http://localhost:3000
+```
+
+Log in with the credentials from `.env`. A `Delta Overview` dashboard is provisioned automatically and uses Prometheus as the default datasource.
+
+### Prometheus
+
+Prometheus is available at:
+
+```text
+http://localhost:9090
+```
+
+Prometheus scrapes the app over the private Compose network at:
+
+```text
+http://app:8080/actuator/prometheus
+```
+
+It authenticates with the bearer token mounted from:
+
+```text
+monitoring/prometheus/prometheus-token.txt
+```
+
+This token must match `.env` value:
+
+```env
+PROMETHEUS_BEARER_TOKEN=...
+```
+
 ### View raw metrics directly
 
-Get an access token, then run:
+Use the monitoring token, not a user JWT:
 
 ```bash
-curl -H "Authorization: Bearer <access-token>" \
+curl -H "Authorization: Bearer <PROMETHEUS_BEARER_TOKEN>" \
   http://localhost:8080/actuator/prometheus
 ```
 
@@ -181,34 +259,6 @@ If Prometheus cannot use your JWT auth flow, secure `/actuator/prometheus` at th
 - reverse-proxy basic auth
 
 Do not expose `/actuator/prometheus` publicly.
-
-## When Grafana is needed
-
-Prometheus stores and queries time-series metrics. Grafana visualizes them.
-
-Use Grafana when you want:
-
-- dashboards for latency, error rate, traffic, JVM, DB pool, and business metrics
-- visual trends over time
-- alert dashboards
-- non-engineers/operators to inspect system health
-- comparison across deploys or time windows
-
-You can start without Grafana by querying Prometheus directly, but Grafana becomes valuable once you need dashboards and operational visibility.
-
-Recommended dashboard panels:
-
-- HTTP request rate by route/status
-- p95/p99 request latency
-- 4xx and 5xx rate
-- JVM heap/non-heap usage
-- GC pauses
-- Hikari active/idle connections
-- DB connection timeout count
-- attendance created count
-- geofence rejection count
-- salary report generation count
-- auth login/refresh success/failure count
 
 ## Secrets guidance
 

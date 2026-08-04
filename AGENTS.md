@@ -24,6 +24,12 @@ Current API version prefix:
 /api/v1
 ```
 
+## API documentation
+
+- API docs are generated at runtime by `springdoc-openapi` (Swagger UI at `/docs`, spec at `/docs/openapi.yaml`).
+- Do not maintain a hand-written OpenAPI spec; the document is derived from controllers and DTOs.
+- Controller and DTO changes are reflected in the docs automatically.
+
 ## Important commands
 
 Run tests:

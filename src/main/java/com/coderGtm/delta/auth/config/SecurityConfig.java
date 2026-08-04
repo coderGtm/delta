@@ -1,6 +1,7 @@
 package com.coderGtm.delta.auth.config;
 
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -10,10 +11,13 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.coderGtm.delta.auth.filter.JwtAuthenticationFilter;
+import com.coderGtm.delta.common.monitoring.PrometheusAccessProperties;
 import com.coderGtm.delta.common.web.ApiPaths;
 import com.coderGtm.delta.common.web.RateLimitingFilter;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authorization.AuthorizationDecision;
 
 /**
  * Configures stateless security for the API.
@@ -24,11 +28,13 @@ import lombok.RequiredArgsConstructor;
  */
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(PrometheusAccessProperties.class)
 @RequiredArgsConstructor
 public class SecurityConfig {
 
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
 	private final RateLimitingFilter rateLimitingFilter;
+	private final PrometheusAccessProperties prometheusAccessProperties;
 
 	/**
 	 * Builds the application's security filter chain.
@@ -43,10 +49,16 @@ public class SecurityConfig {
 					"/actuator/health",
 					"/actuator/health/**",
 					"/actuator/info",
+					"/docs/**",
+					"/swagger-ui/**",
+					"/webjars/**",
 					ApiPaths.AUTH + "/login",
 					ApiPaths.AUTH + "/refresh",
 					ApiPaths.AUTH + "/logout"
 				).permitAll()
+				.requestMatchers("/actuator/prometheus").access((authentication, context) ->
+					new AuthorizationDecision(hasValidPrometheusToken(context.getRequest()))
+				)
 				.anyRequest().authenticated()
 			)
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
@@ -58,6 +70,14 @@ public class SecurityConfig {
 	 * Prevents the rate-limiting filter from also being registered as a container
 	 * filter outside Spring Security's authenticated filter chain.
 	 */
+	private boolean hasValidPrometheusToken(HttpServletRequest request) {
+		String authorization = request.getHeader("Authorization");
+		if (authorization == null || !authorization.startsWith("Bearer ")) {
+			return false;
+		}
+		return prometheusAccessProperties.matches(authorization.substring(7));
+	}
+
 	@Bean
 	public FilterRegistrationBean<RateLimitingFilter> rateLimitingFilterRegistration(RateLimitingFilter filter) {
 		FilterRegistrationBean<RateLimitingFilter> registration = new FilterRegistrationBean<>(filter);

@@ -41,5 +41,8 @@ out/
 .env.*
 !.env.example
 
+### Monitoring local secrets ###
+monitoring/prometheus/prometheus-token.txt
+
 ### Firebase Service Account ###
 firebase/service-account.json

@@ -9,3 +9,4 @@ HELP.md
 .env.*
 !.env.example
 firebase/service-account.json
+monitoring/prometheus/prometheus-token.txt

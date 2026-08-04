@@ -189,9 +189,10 @@ common
  ├── util
  │    ├── GeoUtils
  │    └── PaginationUtils
- └── web
+  └── web
       ├── ApiPaths
       ├── ClientIpUtils
+      ├── DocsRedirectController
       ├── RateLimitingFilter
       └── RequestLoggingFilter
 ```
@@ -203,9 +204,13 @@ Application infrastructure configuration.
 ```text
 config
  ├── FirebaseConfig
+ ├── OpenApiConfig
  ├── PersistenceConfig
  └── WebPaginationConfig
 ```
+
+Notes:
+- `OpenApiConfig` wires springdoc metadata and the JWT bearer security scheme for the generated OpenAPI document.
 
 ## Resources
 
@@ -219,14 +224,28 @@ src/main/resources
 Notes:
 - Database schema is managed by Flyway.
 - Hibernate uses schema validation, not automatic schema updates.
+- API docs are generated at runtime by springdoc (Swagger UI at `/docs`, spec at `/docs/openapi.yaml`); there is no hand-maintained spec file.
 
-## Containerization
+## Containerization and monitoring
 
 ```text
 Dockerfile
 docker-compose.yml
 .dockerignore
 .env.example
+monitoring
+ ├── prometheus
+ │    ├── prometheus.yml
+ │    ├── prometheus-token.example.txt
+ │    └── prometheus-token.txt  # local ignored secret
+ └── grafana
+      ├── dashboards
+      │    └── delta-overview.json
+      └── provisioning
+           ├── dashboards
+           │    └── dashboards.yml
+           └── datasources
+                └── prometheus.yml
 ```
 
 Notes:

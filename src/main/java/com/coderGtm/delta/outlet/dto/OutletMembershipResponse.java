@@ -8,6 +8,9 @@ import com.coderGtm.delta.outlet.entity.OutletRole;
 
 /**
  * API representation of a user's membership in an outlet.
+ *
+ * <p>{@code displayName} is the owner-controlled name to render for this member
+ * in frontend lists; it falls back to the user's account name when not set.</p>
  */
 public record OutletMembershipResponse(
 	UUID membershipId,
@@ -15,6 +18,7 @@ public record OutletMembershipResponse(
 	UUID userId,
 	String userName,
 	String userEmail,
+	String displayName,
 	OutletRole role,
 	OutletMembershipStatus status,
 	UUID invitedByUserId,

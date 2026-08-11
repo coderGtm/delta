@@ -56,6 +56,14 @@ public class OutletMembership extends BaseEntity {
 	@JoinColumn(name = "user_id", nullable = false)
 	private User user;
 
+	/**
+	 * Owner-controlled per-outlet name used to identify this member to humans in
+	 * frontend lists. Defaults to the user's account name at membership
+	 * creation.
+	 */
+	@Column(nullable = false, length = 255)
+	private String displayName;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private OutletRole role;

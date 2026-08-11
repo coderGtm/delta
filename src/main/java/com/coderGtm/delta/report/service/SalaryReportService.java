@@ -93,7 +93,7 @@ public class SalaryReportService {
 
 		SalaryReportResponse report = buildReport(
 			ownerMembership.getOutlet(),
-			employeeMembership.getUser(),
+			employeeMembership,
 			startTime,
 			endTime,
 			zoneId,
@@ -167,13 +167,14 @@ public class SalaryReportService {
 
 	private SalaryReportResponse buildReport(
 		Outlet outlet,
-		User employee,
+		OutletMembership employeeMembership,
 		Instant startTime,
 		Instant endTime,
 		ZoneId zoneId,
 		BigDecimal hourlyRate,
 		List<AttendanceEntry> entries
 	) {
+		User employee = employeeMembership.getUser();
 		LocalDate startDate = startTime.atZone(zoneId).toLocalDate();
 		LocalDate endDate = endTime.minusNanos(1).atZone(zoneId).toLocalDate();
 		Map<LocalDate, List<AttendanceEntry>> entriesByDate = groupByDate(entries, zoneId);
@@ -200,6 +201,7 @@ public class SalaryReportService {
 			employee.getId(),
 			employee.getName(),
 			employee.getEmail(),
+			displayName(employeeMembership),
 			startTime,
 			endTime,
 			zoneId.getId(),
@@ -249,6 +251,10 @@ public class SalaryReportService {
 			.divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
 	}
 
+	private String displayName(OutletMembership membership) {
+		return membership.getDisplayName() != null ? membership.getDisplayName() : membership.getUser().getName();
+	}
+
 	private void writeWorkbook(Workbook workbook, SalaryReportResponse report) {
 		ZoneId zoneId = ZoneId.of(report.timezone());
 		Sheet sheet = workbook.createSheet("Salary Report");
@@ -267,7 +273,7 @@ public class SalaryReportService {
 		createCell(metadataRow, 0, "Outlet", headerStyle);
 		createCell(metadataRow, 1, report.outletName(), null);
 		createCell(metadataRow, 2, "Employee", headerStyle);
-		createCell(metadataRow, 3, report.userName() + " <" + report.userEmail() + ">", null);
+		createCell(metadataRow, 3, report.displayName() + " <" + report.userEmail() + ">", null);
 		createCell(metadataRow, 4, "Period", headerStyle);
 		createCell(metadataRow, 5, report.startTime().atZone(zoneId) + " to " + report.endTime().atZone(zoneId), null);
 		createCell(metadataRow, 6, "Timezone", headerStyle);

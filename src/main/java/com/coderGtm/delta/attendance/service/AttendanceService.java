@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -83,7 +84,7 @@ public class AttendanceService {
 			savedEntry.getId(),
 			Map.of("outletId", outletId, "userId", currentUserId, "type", savedEntry.getType().name(), "mode", "self")
 		);
-		return attendanceMapper.toResponse(savedEntry);
+		return attendanceMapper.toResponse(savedEntry, currentMembership.getDisplayName());
 	}
 
 	/**
@@ -124,7 +125,7 @@ public class AttendanceService {
 			savedEntry.getId(),
 			Map.of("outletId", outletId, "userId", request.userId(), "type", savedEntry.getType().name(), "mode", "managed")
 		);
-		return attendanceMapper.toResponse(savedEntry);
+		return attendanceMapper.toResponse(savedEntry, targetMembership.getDisplayName());
 	}
 
 	/**
@@ -149,7 +150,7 @@ public class AttendanceService {
 				? attendanceEntryRepository.findAllByOutlet_Id(outletId, sortedPageable)
 				: attendanceEntryRepository.findAllByOutlet_IdAndUser_Id(outletId, userId, sortedPageable);
 
-			return PaginationUtils.toPageResponse(entries, attendanceMapper::toResponse);
+			return toPageResponseWithDisplayNames(outletId, entries);
 		}
 
 		if (userId != null && !userId.equals(currentUserId)) {
@@ -162,7 +163,7 @@ public class AttendanceService {
 			sortedPageable
 		);
 
-		return PaginationUtils.toPageResponse(entries, attendanceMapper::toResponse);
+		return toPageResponseWithDisplayNames(outletId, entries);
 	}
 
 	/**
@@ -175,7 +176,7 @@ public class AttendanceService {
 		AttendanceEntry entry = getAttendanceEntryOrThrow(outletId, attendanceEntryId);
 
 		if (currentMembership.getRole() == OutletRole.OWNER || entry.getUser().getId().equals(currentUserId)) {
-			return attendanceMapper.toResponse(entry);
+			return attendanceMapper.toResponse(entry, resolveMemberDisplayName(outletId, entry));
 		}
 
 		throw new ForbiddenException("Employees can only view their own attendance entries");
@@ -211,7 +212,7 @@ public class AttendanceService {
 			attendanceEntryId,
 			Map.of("outletId", outletId, "userId", savedEntry.getUser().getId(), "type", savedEntry.getType().name())
 		);
-		return attendanceMapper.toResponse(savedEntry);
+		return attendanceMapper.toResponse(savedEntry, resolveMemberDisplayName(outletId, savedEntry));
 	}
 
 	/**
@@ -251,6 +252,32 @@ public class AttendanceService {
 	private OutletMembership getActiveMembership(UUID outletId, UUID userId, String notFoundMessage) {
 		return outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, userId)
 			.orElseThrow(() -> new ResourceNotFoundException(notFoundMessage));
+	}
+
+	private PageResponse<AttendanceEntryResponse> toPageResponseWithDisplayNames(
+		UUID outletId,
+		Page<AttendanceEntry> entries
+	) {
+		Map<UUID, String> displayNames = memberDisplayNames(outletId);
+		return PaginationUtils.toPageResponse(
+			entries,
+			entry -> attendanceMapper.toResponse(entry, displayNames.get(entry.getUser().getId()))
+		);
+	}
+
+	private Map<UUID, String> memberDisplayNames(UUID outletId) {
+		return outletMembershipRepository.findAllByOutlet_Id(outletId).stream()
+			.collect(Collectors.toMap(
+				membership -> membership.getUser().getId(),
+				OutletMembership::getDisplayName,
+				(first, second) -> first
+			));
+	}
+
+	private String resolveMemberDisplayName(UUID outletId, AttendanceEntry entry) {
+		return outletMembershipRepository.findByOutlet_IdAndUser_Id(outletId, entry.getUser().getId())
+			.map(OutletMembership::getDisplayName)
+			.orElse(null);
 	}
 
 	private void assertOwner(OutletMembership membership) {

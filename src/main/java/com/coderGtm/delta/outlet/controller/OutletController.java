@@ -24,6 +24,7 @@ import com.coderGtm.delta.outlet.dto.InviteOutletMemberRequest;
 import com.coderGtm.delta.outlet.dto.OutletMembershipResponse;
 import com.coderGtm.delta.outlet.dto.OutletResponse;
 import com.coderGtm.delta.outlet.dto.UpdateOutletGeofenceRequest;
+import com.coderGtm.delta.outlet.dto.UpdateMembershipDisplayNameRequest;
 import com.coderGtm.delta.outlet.dto.UpdateOutletRequest;
 import com.coderGtm.delta.outlet.service.OutletService;
 import com.coderGtm.delta.user.User;
@@ -149,6 +150,22 @@ public class OutletController {
 	) {
 		outletService.removeMembership(currentUser.getId(), outletId, membershipId);
 		return ResponseEntity.noContent().build();
+	}
+
+	/**
+	 * Sets the owner-controlled display name for a member of an outlet. Only
+	 * accepted outlet owners may perform this action.
+	 */
+	@PutMapping("/{outletId}/memberships/{membershipId}/display-name")
+	public ResponseEntity<OutletMembershipResponse> updateMemberDisplayName(
+		@AuthenticationPrincipal User currentUser,
+		@PathVariable UUID outletId,
+		@PathVariable UUID membershipId,
+		@Valid @RequestBody UpdateMembershipDisplayNameRequest request
+	) {
+		return ResponseEntity.ok(
+			outletService.updateMemberDisplayName(currentUser.getId(), outletId, membershipId, request)
+		);
 	}
 
 	/**

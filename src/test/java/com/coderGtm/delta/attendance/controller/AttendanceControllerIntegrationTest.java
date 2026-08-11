@@ -109,6 +109,7 @@ class AttendanceControllerIntegrationTest {
 					"""))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.userId").value(employee.getId().toString()))
+			.andExpect(jsonPath("$.displayName").value("Test User employee-2"))
 			.andExpect(jsonPath("$.type").value("CLOCK_IN"));
 
 		assertThat(attendanceEntryRepository.findAll()).hasSize(1);
@@ -198,6 +199,7 @@ class AttendanceControllerIntegrationTest {
 		OutletMembership membership = new OutletMembership();
 		membership.setOutlet(outlet);
 		membership.setUser(user);
+		membership.setDisplayName(user.getName());
 		membership.setRole(role);
 		membership.setStatus(status);
 		return outletMembershipRepository.saveAndFlush(membership);

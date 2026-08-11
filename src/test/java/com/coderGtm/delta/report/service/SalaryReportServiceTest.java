@@ -105,6 +105,7 @@ class SalaryReportServiceTest {
 		assertThat(response.timezone()).isEqualTo("Asia/Kolkata");
 		assertThat(response.startTime()).isEqualTo(startTime);
 		assertThat(response.endTime()).isEqualTo(endTime);
+		assertThat(response.displayName()).isEqualTo("Employee");
 		assertThat(response.days()).hasSize(4);
 		assertThat(response.days().get(0).attendancePairs()).hasSize(2);
 		assertThat(response.days().get(0).totalHours()).isEqualByComparingTo("7.00");
@@ -197,6 +198,7 @@ class SalaryReportServiceTest {
 
 		try (Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(workbookBytes))) {
 			assertThat(workbook.getSheet("Salary Report")).isNotNull();
+			assertThat(workbook.getSheetAt(0).getRow(1).getCell(3).getStringCellValue()).isEqualTo("Employee <employee@example.com>");
 			assertThat(workbook.getSheetAt(0).getRow(1).getCell(7).getStringCellValue()).isEqualTo("Asia/Kolkata");
 			assertThat(workbook.getSheetAt(0).getRow(3).getCell(0).getStringCellValue()).isEqualTo("Date");
 			assertThat(workbook.getSheetAt(0).getRow(3).getCell(1).getStringCellValue()).isEqualTo("Clock In 1");
@@ -253,6 +255,7 @@ class SalaryReportServiceTest {
 		membership.setId(UUID.randomUUID());
 		membership.setOutlet(outlet);
 		membership.setUser(user);
+		membership.setDisplayName(user.getName());
 		membership.setRole(role);
 		membership.setStatus(status);
 		return membership;

@@ -24,6 +24,7 @@ import com.coderGtm.delta.outlet.dto.InviteOutletMemberRequest;
 import com.coderGtm.delta.outlet.dto.OutletMembershipResponse;
 import com.coderGtm.delta.outlet.dto.OutletResponse;
 import com.coderGtm.delta.outlet.dto.UpdateOutletGeofenceRequest;
+import com.coderGtm.delta.outlet.dto.UpdateMembershipDisplayNameRequest;
 import com.coderGtm.delta.outlet.dto.UpdateOutletRequest;
 import com.coderGtm.delta.outlet.entity.Outlet;
 import com.coderGtm.delta.outlet.entity.OutletMembership;
@@ -75,6 +76,7 @@ public class OutletService {
 		OutletMembership ownerMembership = new OutletMembership();
 		ownerMembership.setOutlet(savedOutlet);
 		ownerMembership.setUser(currentUser);
+		ownerMembership.setDisplayName(currentUser.getName());
 		ownerMembership.setRole(OutletRole.OWNER);
 		ownerMembership.setStatus(OutletMembershipStatus.ACCEPTED);
 		ownerMembership.setInvitedBy(null);
@@ -235,6 +237,7 @@ public class OutletService {
 		OutletMembership membership = new OutletMembership();
 		membership.setOutlet(outlet);
 		membership.setUser(invitee);
+		membership.setDisplayName(invitee.getName());
 		membership.setRole(OutletRole.EMPLOYEE);
 		membership.setStatus(OutletMembershipStatus.INVITED);
 		membership.setInvitedBy(inviter);
@@ -248,6 +251,38 @@ public class OutletService {
 		} catch (DataIntegrityViolationException ex) {
 			throw new ConflictException("User already has a membership record for this outlet");
 		}
+	}
+
+	/**
+	 * Sets the owner-controlled display name for a member of an outlet. Only
+	 * accepted outlet owners may perform this action.
+	 */
+	@Transactional
+	public OutletMembershipResponse updateMemberDisplayName(
+		UUID currentUserId,
+		UUID outletId,
+		UUID membershipId,
+		UpdateMembershipDisplayNameRequest request
+	) {
+		assertAcceptedOwner(outletId, currentUserId);
+		OutletMembership membership = getMembershipDetails(membershipId);
+
+		if (!membership.getOutlet().getId().equals(outletId)) {
+			throw new BadRequestException("The provided membership does not belong to the requested outlet");
+		}
+
+		String displayName = request.displayName().trim();
+		membership.setDisplayName(displayName);
+		OutletMembership savedMembership = outletMembershipRepository.save(membership);
+		applicationMetrics.increment("outlet.membership.display_name.updated");
+		auditService.record(
+			currentUserId,
+			"OUTLET_MEMBERSHIP_DISPLAY_NAME_UPDATED",
+			"OUTLET_MEMBERSHIP",
+			membershipId,
+			Map.of("outletId", outletId, "userId", membership.getUser().getId(), "displayName", displayName)
+		);
+		return outletMapper.toMembershipResponse(savedMembership);
 	}
 
 	/**

@@ -85,6 +85,32 @@ class OutletControllerIntegrationTest {
 	}
 
 	@Test
+	void updateMemberDisplayNamePersistsOwnerControlledNameForEmployee() throws Exception {
+		User owner = persistUser("owner-display");
+		User employee = persistUser("employee-display");
+		Outlet outlet = persistOutlet("Outlet A", false);
+		persistMembership(outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+		OutletMembership employeeMembership = persistMembership(outlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.ACCEPTED);
+
+		mockMvc.perform(put("/api/v1/outlets/{outletId}/memberships/{membershipId}/display-name", outlet.getId(), employeeMembership.getId())
+				.header("Authorization", "Bearer " + jwtService.generateAccessToken(owner))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  \"displayName\": \"Nickname\"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.membershipId").value(employeeMembership.getId().toString()))
+			.andExpect(jsonPath("$.userId").value(employee.getId().toString()))
+			.andExpect(jsonPath("$.displayName").value("Nickname"));
+
+		assertThat(outletMembershipRepository.findDetailedByIdAndRemovedAtIsNull(employeeMembership.getId())
+			.orElseThrow()
+			.getDisplayName()).isEqualTo("Nickname");
+	}
+
+	@Test
 	void getMyOutletsReturnsPaginatedResponse() throws Exception {
 		User user = persistUser("employee");
 		Outlet firstOutlet = persistOutlet("Outlet A", false);
@@ -132,6 +158,7 @@ class OutletControllerIntegrationTest {
 		OutletMembership membership = new OutletMembership();
 		membership.setOutlet(outlet);
 		membership.setUser(user);
+		membership.setDisplayName(user.getName());
 		membership.setRole(role);
 		membership.setStatus(status);
 		return outletMembershipRepository.saveAndFlush(membership);

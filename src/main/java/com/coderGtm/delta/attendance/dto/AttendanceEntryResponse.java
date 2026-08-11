@@ -9,6 +9,10 @@ import com.coderGtm.delta.attendance.entity.AttendanceEntryType;
 /**
  * API representation of an attendance entry, including user context and audit
  * metadata.
+ *
+ * <p>{@code displayName} is the outlet-scoped owner-controlled name to render
+ * for the entry's user; it falls back to the user's account name when the user
+ * is no longer an active member.</p>
  */
 public record AttendanceEntryResponse(
 	UUID id,
@@ -16,6 +20,7 @@ public record AttendanceEntryResponse(
 	UUID userId,
 	String userName,
 	String userEmail,
+	String displayName,
 	AttendanceEntryType type,
 	Instant entryTime,
 	BigDecimal latitude,

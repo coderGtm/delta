@@ -113,6 +113,7 @@ class AttendanceServiceTest {
 		assertThat(captor.getValue().getEntryTime()).isEqualTo(FIXED_NOW);
 		assertThat(response.entryTime()).isEqualTo(FIXED_NOW);
 		assertThat(response.userId()).isEqualTo(employeeId);
+		assertThat(response.displayName()).isEqualTo("Employee");
 		assertThat(response.type()).isEqualTo(AttendanceEntryType.CLOCK_IN);
 	}
 
@@ -223,7 +224,7 @@ class AttendanceServiceTest {
 	}
 
 	@Test
-	void getAttendanceEntriesForOwnerSupportsHistoricalEntriesForRemovedEmployees() {
+	void getAttendanceEntriesForOwnerKeepsMembershipDisplayNameForRemovedEmployees() {
 		UUID outletId = UUID.randomUUID();
 		UUID ownerId = UUID.randomUUID();
 		UUID removedEmployeeId = UUID.randomUUID();
@@ -239,6 +240,15 @@ class AttendanceServiceTest {
 			OutletRole.OWNER,
 			OutletMembershipStatus.ACCEPTED
 		);
+		OutletMembership removedEmployeeMembership = membership(
+			UUID.randomUUID(),
+			outlet,
+			removedEmployee,
+			OutletRole.EMPLOYEE,
+			OutletMembershipStatus.ACCEPTED
+		);
+		removedEmployeeMembership.setDisplayName("Nickname");
+		removedEmployeeMembership.setRemovedAt(Instant.parse("2024-04-21T00:00:00Z"));
 		AttendanceEntry historicalEntry = attendanceEntry(
 			UUID.randomUUID(),
 			outlet,
@@ -249,6 +259,8 @@ class AttendanceServiceTest {
 
 		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
 			.thenReturn(Optional.of(ownerMembership));
+		when(outletMembershipRepository.findAllByOutlet_Id(outletId))
+			.thenReturn(List.of(ownerMembership, removedEmployeeMembership));
 		when(attendanceEntryRepository.findAllByOutlet_IdAndUser_Id(
 			outletId,
 			removedEmployeeId,
@@ -271,6 +283,8 @@ class AttendanceServiceTest {
 
 		assertThat(responses.content()).hasSize(1);
 		assertThat(responses.content().getFirst().userId()).isEqualTo(removedEmployeeId);
+		assertThat(responses.content().getFirst().displayName()).isEqualTo("Nickname");
+		assertThat(responses.content().getFirst().userName()).isEqualTo("Employee");
 		assertThat(responses.totalElements()).isEqualTo(1);
 		verify(outletMembershipRepository, never())
 			.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, removedEmployeeId);
@@ -329,6 +343,15 @@ class AttendanceServiceTest {
 			OutletRole.OWNER,
 			OutletMembershipStatus.ACCEPTED
 		);
+		OutletMembership removedEmployeeMembership = membership(
+			UUID.randomUUID(),
+			outlet,
+			removedEmployee,
+			OutletRole.EMPLOYEE,
+			OutletMembershipStatus.ACCEPTED
+		);
+		removedEmployeeMembership.setDisplayName("Nickname");
+		removedEmployeeMembership.setRemovedAt(Instant.parse("2024-04-21T00:00:00Z"));
 		AttendanceEntry historicalEntry = attendanceEntry(
 			attendanceEntryId,
 			outlet,
@@ -339,6 +362,8 @@ class AttendanceServiceTest {
 
 		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
 			.thenReturn(Optional.of(ownerMembership));
+		when(outletMembershipRepository.findByOutlet_IdAndUser_Id(outletId, removedEmployee.getId()))
+			.thenReturn(Optional.of(removedEmployeeMembership));
 		when(attendanceEntryRepository.findDetailedByIdAndOutlet_Id(attendanceEntryId, outletId))
 			.thenReturn(Optional.of(historicalEntry));
 		when(attendanceEntryRepository.save(historicalEntry)).thenReturn(historicalEntry);
@@ -358,6 +383,7 @@ class AttendanceServiceTest {
 		assertThat(response.type()).isEqualTo(AttendanceEntryType.CLOCK_OUT);
 		assertThat(response.entryTime()).isEqualTo(Instant.parse("2024-04-20T18:10:00Z"));
 		assertThat(response.latitude()).isEqualByComparingTo("13.0000000");
+		assertThat(response.displayName()).isEqualTo("Nickname");
 	}
 
 	@Test
@@ -424,6 +450,7 @@ class AttendanceServiceTest {
 		membership.setId(id);
 		membership.setOutlet(outlet);
 		membership.setUser(user);
+		membership.setDisplayName(user.getName());
 		membership.setRole(role);
 		membership.setStatus(status);
 		return membership;

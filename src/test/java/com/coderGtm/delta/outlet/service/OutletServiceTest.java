@@ -167,6 +167,7 @@ class OutletServiceTest {
 
 		assertThat(response.status()).isEqualTo(OutletMembershipStatus.INVITED);
 		assertThat(response.userEmail()).isEqualTo("employee@example.com");
+		assertThat(response.displayName()).isEqualTo("Employee");
 		assertThat(response.invitedByUserId()).isEqualTo(ownerId);
 	}
 
@@ -315,6 +316,85 @@ class OutletServiceTest {
 			.hasMessage("Owner memberships cannot be removed through this endpoint");
 	}
 
+	@Test
+	void updateMemberDisplayNameAllowsAcceptedOwnerToCustomizeMemberName() {
+		UUID outletId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
+		UUID membershipId = UUID.randomUUID();
+		User owner = user(ownerId, "owner@example.com", "Owner");
+		User employee = user(UUID.randomUUID(), "employee@example.com", "Employee");
+		Outlet outlet = outlet(outletId, "Outlet A");
+		OutletMembership ownerMembership = membership(UUID.randomUUID(), outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+		OutletMembership employeeMembership = membership(membershipId, outlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.ACCEPTED);
+
+		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
+			.thenReturn(Optional.of(ownerMembership));
+		when(outletMembershipRepository.findDetailedByIdAndRemovedAtIsNull(membershipId))
+			.thenReturn(Optional.of(employeeMembership));
+		when(outletMembershipRepository.save(employeeMembership)).thenReturn(employeeMembership);
+
+		OutletMembershipResponse response = outletService.updateMemberDisplayName(
+			ownerId,
+			outletId,
+			membershipId,
+			new com.coderGtm.delta.outlet.dto.UpdateMembershipDisplayNameRequest("  Shiny  ")
+		);
+
+		assertThat(response.displayName()).isEqualTo("Shiny");
+		assertThat(employeeMembership.getDisplayName()).isEqualTo("Shiny");
+		verify(outletMembershipRepository).save(employeeMembership);
+	}
+
+	@Test
+	void updateMemberDisplayNameRejectsNonOwner() {
+		UUID outletId = UUID.randomUUID();
+		UUID employeeId = UUID.randomUUID();
+		UUID membershipId = UUID.randomUUID();
+		User employee = user(employeeId, "employee@example.com", "Employee");
+		Outlet outlet = outlet(outletId, "Outlet A");
+		OutletMembership employeeMembership = membership(membershipId, outlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.ACCEPTED);
+
+		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, employeeId))
+			.thenReturn(Optional.of(employeeMembership));
+
+		assertThatThrownBy(() -> outletService.updateMemberDisplayName(
+			employeeId,
+			outletId,
+			membershipId,
+			new com.coderGtm.delta.outlet.dto.UpdateMembershipDisplayNameRequest("Other")
+		))
+			.isInstanceOf(ForbiddenException.class)
+			.hasMessage("Only outlet owners can perform this action");
+	}
+
+	@Test
+	void updateMemberDisplayNameRejectsMembershipFromAnotherOutlet() {
+		UUID outletId = UUID.randomUUID();
+		UUID otherOutletId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
+		UUID membershipId = UUID.randomUUID();
+		User owner = user(ownerId, "owner@example.com", "Owner");
+		User employee = user(UUID.randomUUID(), "employee@example.com", "Employee");
+		Outlet outlet = outlet(outletId, "Outlet A");
+		Outlet otherOutlet = outlet(otherOutletId, "Outlet B");
+		OutletMembership ownerMembership = membership(UUID.randomUUID(), outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+		OutletMembership employeeMembership = membership(membershipId, otherOutlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.ACCEPTED);
+
+		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
+			.thenReturn(Optional.of(ownerMembership));
+		when(outletMembershipRepository.findDetailedByIdAndRemovedAtIsNull(membershipId))
+			.thenReturn(Optional.of(employeeMembership));
+
+		assertThatThrownBy(() -> outletService.updateMemberDisplayName(
+			ownerId,
+			outletId,
+			membershipId,
+			new com.coderGtm.delta.outlet.dto.UpdateMembershipDisplayNameRequest("Other")
+		))
+			.isInstanceOf(BadRequestException.class)
+			.hasMessage("The provided membership does not belong to the requested outlet");
+	}
+
 	private User user(UUID id, String email, String name) {
 		User user = new User();
 		user.setId(id);
@@ -344,6 +424,7 @@ class OutletServiceTest {
 		membership.setId(id);
 		membership.setOutlet(outlet);
 		membership.setUser(user);
+		membership.setDisplayName(user.getName());
 		membership.setRole(role);
 		membership.setStatus(status);
 		return membership;

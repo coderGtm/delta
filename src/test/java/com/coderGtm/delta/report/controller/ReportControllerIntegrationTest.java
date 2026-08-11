@@ -81,6 +81,7 @@ class ReportControllerIntegrationTest {
 				.param("hourlyRate", "100.00"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.userId").value(fixture.employee().getId().toString()))
+			.andExpect(jsonPath("$.displayName").value("Test User employee"))
 			.andExpect(jsonPath("$.startTime").value("2024-01-01T00:00:00Z"))
 			.andExpect(jsonPath("$.endTime").value("2024-01-02T00:00:00Z"))
 			.andExpect(jsonPath("$.timezone").value("UTC"))
@@ -139,6 +140,7 @@ class ReportControllerIntegrationTest {
 		OutletMembership membership = new OutletMembership();
 		membership.setOutlet(outlet);
 		membership.setUser(user);
+		membership.setDisplayName(user.getName());
 		membership.setRole(role);
 		membership.setStatus(OutletMembershipStatus.ACCEPTED);
 		outletMembershipRepository.saveAndFlush(membership);

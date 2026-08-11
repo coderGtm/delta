@@ -100,6 +100,10 @@ src/main/resources/db/migration
 
 - Creating an outlet auto-creates an accepted `OWNER` membership for the creator.
 - Owners can invite existing users by email.
+- Memberships carry an owner-controlled `displayName` that is initialized to the user's account name when the membership record is first created.
+- Owners can update a member's `displayName` via `PUT /api/v1/outlets/{outletId}/memberships/{membershipId}/display-name`.
+- The membership `displayName` is the human-facing identifier; it is forwarded to membership, attendance, and salary report responses (and the Excel export).
+- Historical/read paths resolve `displayName` from the membership row even after soft removal, so attendance logs keep showing the custom display name; it only falls back to the user's account name when no membership row exists.
 - Invited employees can accept or reject invites.
 - Re-invite reuses existing membership and resets status to `INVITED`.
 - Membership removal is soft removal with `removedAt` / `removedBy`.

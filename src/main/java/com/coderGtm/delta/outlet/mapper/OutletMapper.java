@@ -36,13 +36,16 @@ public class OutletMapper {
 	 */
 	public OutletMembershipResponse toMembershipResponse(OutletMembership membership) {
 		User invitedBy = membership.getInvitedBy();
+		User user = membership.getUser();
+		String displayName = membership.getDisplayName() != null ? membership.getDisplayName() : user.getName();
 
 		return new OutletMembershipResponse(
 			membership.getId(),
 			toOutletResponse(membership.getOutlet()),
-			membership.getUser().getId(),
-			membership.getUser().getName(),
-			membership.getUser().getEmail(),
+			user.getId(),
+			user.getName(),
+			user.getEmail(),
+			displayName,
 			membership.getRole(),
 			membership.getStatus(),
 			invitedBy != null ? invitedBy.getId() : null,

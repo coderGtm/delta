@@ -105,11 +105,20 @@ src/main/resources/db/migration
 - The membership `displayName` is the human-facing identifier; it is forwarded to membership, attendance, and salary report responses (and the Excel export).
 - Historical/read paths resolve `displayName` from the membership row even after soft removal, so attendance logs keep showing the custom display name; it only falls back to the user's account name when no membership row exists.
 - Invited employees can accept or reject invites.
+- Employees can leave an outlet on their own via `POST /api/v1/outlets/{outletId}/leave`; this soft-removes their membership exactly like owner-driven removal and is reversible by an owner re-invite.
+- Owners cannot leave an outlet through the leave endpoint (they delete the outlet instead).
 - Re-invite reuses existing membership and resets status to `INVITED`.
 - Membership removal is soft removal with `removedAt` / `removedBy`.
 - Removed memberships should disappear from active access/invite/listing checks.
 - Historical attendance must remain valid after membership removal.
 - Owner memberships cannot be removed through the current remove endpoint.
+
+### Outlet deletion
+
+- Outlets are soft-deleted via `DELETE /api/v1/outlets/{outletId}` (owner-only), setting `removedAt` / `removedBy` on the outlet row.
+- Deleting an outlet does NOT soft-remove its memberships; those remain so a later data-retention cleanup job can identify the outlet's membership and attendance records by `removed_at`.
+- Soft-deleted outlets are excluded from active access checks (`OutletRepository.findByIdAndRemovedAtIsNull`) and hidden from `GET /outlets/mine` and `GET /outlets/invites`.
+- Historical attendance reads remain readable for deleted outlets; attendance writes (create/update/delete) are rejected for deleted outlets.
 
 ### Attendance
 
@@ -128,6 +137,15 @@ src/main/resources/db/migration
 - DB filtering uses exact instants.
 - Daily grouping and Excel display use the provided IANA timezone.
 - Excel exports use Apache POI.
+
+### User accounts
+
+- Users can delete their own account via `DELETE /api/v1/users/me`.
+- Deleting an account removes the Firebase Auth record (`FirebaseService.deleteUser`) so a future sign-in with the same provider email receives a fresh UID, then soft-deletes the local user (`deletedAt`).
+- On deletion the user's email is moved to `historicalEmail` and the active `email` column is cleared, so the unique email constraint does not block a brand-new account using the same email.
+- All active refresh tokens are revoked on deletion.
+- Historical attendance and membership rows are preserved after user deletion; attendance continues to resolve names from membership rows.
+- Login only resolves active users (`findByAuthUidAndDeletedAtIsNull`), so a deleted account is never resurrected.
 
 ## Pagination
 
@@ -154,8 +172,9 @@ common/audit/service/AuditService.java
 Examples:
 
 - auth login/refresh/logout-all
-- outlet created/updated/geofence toggled
-- membership invited/accepted/rejected/removed
+- user account deleted
+- outlet created/updated/geofence toggled/deleted
+- membership invited/accepted/rejected/removed/left
 - attendance created/updated/deleted
 - report generated/exported
 

@@ -126,6 +126,32 @@ public class OutletController {
 	}
 
 	/**
+	 * Soft-deletes an outlet. Only accepted outlet owners may perform this action.
+	 */
+	@DeleteMapping("/{outletId}")
+	public ResponseEntity<Void> deleteOutlet(
+		@AuthenticationPrincipal User currentUser,
+		@PathVariable UUID outletId
+	) {
+		outletService.deleteOutlet(currentUser.getId(), outletId);
+		return ResponseEntity.noContent().build();
+	}
+
+	/**
+	 * Lets the authenticated employee leave an outlet on their own, revoking
+	 * access while keeping historical attendance intact. Owners cannot leave
+	 * through this endpoint.
+	 */
+	@PostMapping("/{outletId}/leave")
+	public ResponseEntity<Void> leaveOutlet(
+		@AuthenticationPrincipal User currentUser,
+		@PathVariable UUID outletId
+	) {
+		outletService.leaveOutlet(currentUser.getId(), outletId);
+		return ResponseEntity.noContent().build();
+	}
+
+	/**
 	 * Sends an invitation to an existing user to join the outlet as an employee.
 	 */
 	@PostMapping("/{outletId}/memberships/invite")

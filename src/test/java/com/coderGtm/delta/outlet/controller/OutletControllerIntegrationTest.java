@@ -1,7 +1,9 @@
 package com.coderGtm.delta.outlet.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -128,6 +130,84 @@ class OutletControllerIntegrationTest {
 			.andExpect(jsonPath("$.size").value(1))
 			.andExpect(jsonPath("$.totalElements").value(2))
 			.andExpect(jsonPath("$.totalPages").value(2));
+	}
+
+	@Test
+	void deleteOutletSoftDeletesOutletForOwner() throws Exception {
+		User owner = persistUser("owner-delete");
+		Outlet outlet = persistOutlet("Outlet A", false);
+		persistMembership(outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+
+		mockMvc.perform(delete("/api/v1/outlets/{outletId}", outlet.getId())
+				.header("Authorization", "Bearer " + jwtService.generateAccessToken(owner)))
+			.andExpect(status().isNoContent());
+
+		Outlet deletedOutlet = outletRepository.findById(outlet.getId()).orElseThrow();
+		assertThat(deletedOutlet.getRemovedAt()).isNotNull();
+		assertThat(deletedOutlet.getRemovedBy().getId()).isEqualTo(owner.getId());
+	}
+
+	@Test
+	void deleteOutletRejectsNonOwner() throws Exception {
+		User owner = persistUser("owner-delete-2");
+		User employee = persistUser("employee-delete");
+		Outlet outlet = persistOutlet("Outlet A", false);
+		persistMembership(outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+		persistMembership(outlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.ACCEPTED);
+
+		mockMvc.perform(delete("/api/v1/outlets/{outletId}", outlet.getId())
+				.header("Authorization", "Bearer " + jwtService.generateAccessToken(employee)))
+			.andExpect(status().isForbidden());
+
+		assertThat(outletRepository.findById(outlet.getId()).orElseThrow().getRemovedAt()).isNull();
+	}
+
+	@Test
+	void deletedOutletIsHiddenFromMyOutlets() throws Exception {
+		User employee = persistUser("employee-hidden");
+		Outlet deletedOutlet = persistOutlet("Deleted Outlet", false);
+		Outlet activeOutlet = persistOutlet("Active Outlet", false);
+		persistMembership(deletedOutlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.ACCEPTED);
+		persistMembership(activeOutlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.ACCEPTED);
+
+		Outlet deleted = outletRepository.findById(deletedOutlet.getId()).orElseThrow();
+		deleted.setRemovedAt(java.time.Instant.now());
+		outletRepository.saveAndFlush(deleted);
+
+		mockMvc.perform(get("/api/v1/outlets/mine")
+				.header("Authorization", "Bearer " + jwtService.generateAccessToken(employee)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content.length()").value(1))
+			.andExpect(jsonPath("$.content[0].outlet.name").value("Active Outlet"));
+	}
+
+	@Test
+	void leaveOutletSoftDeletesOwnEmployeeMembership() throws Exception {
+		User owner = persistUser("owner-leave");
+		User employee = persistUser("employee-leave");
+		Outlet outlet = persistOutlet("Outlet A", false);
+		OutletMembership ownerMembership = persistMembership(outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+		OutletMembership employeeMembership = persistMembership(outlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.ACCEPTED);
+
+		mockMvc.perform(post("/api/v1/outlets/{outletId}/leave", outlet.getId())
+				.header("Authorization", "Bearer " + jwtService.generateAccessToken(employee)))
+			.andExpect(status().isNoContent());
+
+		assertThat(outletMembershipRepository.findByOutlet_IdAndUser_Id(outlet.getId(), employee.getId())
+			.orElseThrow()
+			.getRemovedAt()).isNotNull();
+		assertThat(ownerMembership.getRemovedAt()).isNull();
+	}
+
+	@Test
+	void leaveOutletRejectsOwner() throws Exception {
+		User owner = persistUser("owner-leave-block");
+		Outlet outlet = persistOutlet("Outlet A", false);
+		persistMembership(outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+
+		mockMvc.perform(post("/api/v1/outlets/{outletId}/leave", outlet.getId())
+				.header("Authorization", "Bearer " + jwtService.generateAccessToken(owner)))
+			.andExpect(status().isBadRequest());
 	}
 
 	private User persistUser(String authUidPrefix) {

@@ -32,4 +32,13 @@ public class FirebaseService {
 			(String) decodedToken.getClaims().get("phone_number")
 		);
 	}
+
+	/**
+	 * Deletes the Firebase Auth record for the given UID. A later sign-in with
+	 * the same provider account receives a fresh UID, allowing a completely new
+	 * local account to be created without ties to the old one.
+	 */
+	public void deleteUser(String authUid) throws FirebaseAuthException {
+		firebaseAuth.deleteUser(authUid);
+	}
 }

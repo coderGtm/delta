@@ -60,6 +60,7 @@ public class AttendanceService {
 	@Transactional
 	public AttendanceEntryResponse createOwnEntry(UUID currentUserId, UUID outletId, CreateAttendanceEntryRequest request) {
 		OutletMembership currentMembership = assertAcceptedCurrentMembership(outletId, currentUserId);
+		assertActiveOutlet(currentMembership.getOutlet());
 
 		if (currentMembership.getRole() != OutletRole.EMPLOYEE) {
 			throw new ForbiddenException("Only accepted employees can create their own attendance entries");
@@ -94,6 +95,7 @@ public class AttendanceService {
 	public AttendanceEntryResponse createManagedEntry(UUID currentUserId, UUID outletId, ManageAttendanceEntryRequest request) {
 		OutletMembership currentMembership = assertAcceptedCurrentMembership(outletId, currentUserId);
 		assertOwner(currentMembership);
+		assertActiveOutlet(currentMembership.getOutlet());
 
 		OutletMembership targetMembership = getActiveMembership(
 			outletId,
@@ -195,6 +197,7 @@ public class AttendanceService {
 	) {
 		OutletMembership currentMembership = assertAcceptedCurrentMembership(outletId, currentUserId);
 		assertOwner(currentMembership);
+		assertActiveOutlet(currentMembership.getOutlet());
 
 		AttendanceEntry entry = getAttendanceEntryOrThrow(outletId, attendanceEntryId);
 		validateGeofenceIfEnabled(entry.getOutlet(), request.latitude(), request.longitude());
@@ -223,6 +226,7 @@ public class AttendanceService {
 	public void deleteAttendanceEntry(UUID currentUserId, UUID outletId, UUID attendanceEntryId) {
 		OutletMembership currentMembership = assertAcceptedCurrentMembership(outletId, currentUserId);
 		assertOwner(currentMembership);
+		assertActiveOutlet(currentMembership.getOutlet());
 		AttendanceEntry entry = getAttendanceEntryOrThrow(outletId, attendanceEntryId);
 		attendanceEntryRepository.delete(entry);
 		applicationMetrics.increment("attendance.deleted");
@@ -283,6 +287,12 @@ public class AttendanceService {
 	private void assertOwner(OutletMembership membership) {
 		if (membership.getRole() != OutletRole.OWNER) {
 			throw new ForbiddenException("Only outlet owners can perform this action");
+		}
+	}
+
+	private void assertActiveOutlet(com.coderGtm.delta.outlet.entity.Outlet outlet) {
+		if (outlet.getRemovedAt() != null) {
+			throw new ResourceNotFoundException("Outlet not found: " + outlet.getId());
 		}
 	}
 

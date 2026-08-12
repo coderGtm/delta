@@ -99,6 +99,7 @@ public class OutletService {
 	 */
 	@Transactional(readOnly = true)
 	public OutletResponse getOutlet(UUID currentUserId, UUID outletId) {
+		getActiveOutletOrThrow(outletId);
 		OutletMembership membership = getMembershipOrThrow(outletId, currentUserId);
 		ensureAcceptedMembership(membership);
 		return outletMapper.toOutletResponse(membership.getOutlet());
@@ -111,8 +112,7 @@ public class OutletService {
 	public OutletResponse updateOutlet(UUID currentUserId, UUID outletId, UpdateOutletRequest request) {
 		assertAcceptedOwner(outletId, currentUserId);
 
-		Outlet outlet = outletRepository.findById(outletId)
-			.orElseThrow(() -> new ResourceNotFoundException("Outlet not found: " + outletId));
+		Outlet outlet = getActiveOutletOrThrow(outletId);
 
 		outlet.setName(request.name().trim());
 		outlet.setLatitude(request.latitude());
@@ -133,8 +133,7 @@ public class OutletService {
 	public OutletResponse updateOutletGeofence(UUID currentUserId, UUID outletId, UpdateOutletGeofenceRequest request) {
 		assertAcceptedOwner(outletId, currentUserId);
 
-		Outlet outlet = outletRepository.findById(outletId)
-			.orElseThrow(() -> new ResourceNotFoundException("Outlet not found: " + outletId));
+		Outlet outlet = getActiveOutletOrThrow(outletId);
 
 		outlet.setGeofenceEnabled(Boolean.TRUE.equals(request.geofenceEnabled()));
 		Outlet savedOutlet = outletRepository.save(outlet);
@@ -154,11 +153,12 @@ public class OutletService {
 	 */
 	@Transactional(readOnly = true)
 	public PageResponse<OutletMembershipResponse> getMyOutlets(UUID currentUserId, Pageable pageable) {
-		Page<OutletMembership> memberships = outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNull(
-			currentUserId,
-			OutletMembershipStatus.ACCEPTED,
-			PaginationUtils.withDefaultSort(pageable, Sort.by(Sort.Direction.DESC, "updatedAt"))
-		);
+		Page<OutletMembership> memberships = outletMembershipRepository
+			.findAllByUser_IdAndStatusAndRemovedAtIsNullAndOutlet_RemovedAtIsNull(
+				currentUserId,
+				OutletMembershipStatus.ACCEPTED,
+				PaginationUtils.withDefaultSort(pageable, Sort.by(Sort.Direction.DESC, "updatedAt"))
+			);
 
 		return PaginationUtils.toPageResponse(memberships, outletMapper::toMembershipResponse);
 	}
@@ -168,11 +168,12 @@ public class OutletService {
 	 */
 	@Transactional(readOnly = true)
 	public PageResponse<OutletMembershipResponse> getMyInvites(UUID currentUserId, Pageable pageable) {
-		Page<OutletMembership> memberships = outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNull(
-			currentUserId,
-			OutletMembershipStatus.INVITED,
-			PaginationUtils.withDefaultSort(pageable, Sort.by(Sort.Direction.DESC, "updatedAt"))
-		);
+		Page<OutletMembership> memberships = outletMembershipRepository
+			.findAllByUser_IdAndStatusAndRemovedAtIsNullAndOutlet_RemovedAtIsNull(
+				currentUserId,
+				OutletMembershipStatus.INVITED,
+				PaginationUtils.withDefaultSort(pageable, Sort.by(Sort.Direction.DESC, "updatedAt"))
+			);
 
 		return PaginationUtils.toPageResponse(memberships, outletMapper::toMembershipResponse);
 	}
@@ -183,6 +184,7 @@ public class OutletService {
 	@Transactional(readOnly = true)
 	public PageResponse<OutletMembershipResponse> getOutletMemberships(UUID currentUserId, UUID outletId, Pageable pageable) {
 		assertAcceptedOwner(outletId, currentUserId);
+		getActiveOutletOrThrow(outletId);
 
 		Page<OutletMembership> memberships = outletMembershipRepository.findAllByOutlet_IdAndRemovedAtIsNull(
 			outletId,
@@ -231,8 +233,7 @@ public class OutletService {
 			}
 		}
 
-		Outlet outlet = outletRepository.findById(outletId)
-			.orElseThrow(() -> new ResourceNotFoundException("Outlet not found: " + outletId));
+		Outlet outlet = getActiveOutletOrThrow(outletId);
 
 		OutletMembership membership = new OutletMembership();
 		membership.setOutlet(outlet);
@@ -265,6 +266,7 @@ public class OutletService {
 		UpdateMembershipDisplayNameRequest request
 	) {
 		assertAcceptedOwner(outletId, currentUserId);
+		getActiveOutletOrThrow(outletId);
 		OutletMembership membership = getMembershipDetails(membershipId);
 
 		if (!membership.getOutlet().getId().equals(outletId)) {
@@ -343,6 +345,7 @@ public class OutletService {
 	@Transactional
 	public void removeMembership(UUID currentUserId, UUID outletId, UUID membershipId) {
 		User owner = assertAcceptedOwner(outletId, currentUserId);
+		getActiveOutletOrThrow(outletId);
 		OutletMembership membership = getMembershipDetails(membershipId);
 
 		if (!membership.getOutlet().getId().equals(outletId)) {
@@ -366,6 +369,56 @@ public class OutletService {
 		);
 	}
 
+	/**
+	 * Lets the authenticated employee leave an outlet on their own, soft-removing
+	 * their membership so access is revoked while historical attendance stays
+	 * valid. Owners cannot leave through this endpoint.
+	 */
+	@Transactional
+	public void leaveOutlet(UUID currentUserId, UUID outletId) {
+		User currentUser = getActiveUser(currentUserId);
+		OutletMembership membership = getMembershipOrThrow(outletId, currentUserId);
+
+		if (membership.getRole() == OutletRole.OWNER) {
+			throw new BadRequestException("Owners cannot leave an outlet through this endpoint");
+		}
+
+		membership.setRemovedAt(Instant.now());
+		membership.setRemovedBy(currentUser);
+		outletMembershipRepository.save(membership);
+		applicationMetrics.increment("outlet.membership.left");
+		auditService.record(
+			currentUserId,
+			"OUTLET_MEMBERSHIP_LEFT",
+			"OUTLET_MEMBERSHIP",
+			membership.getId(),
+			Map.of("outletId", outletId)
+		);
+	}
+
+	/**
+	 * Soft-deletes an outlet on behalf of an accepted owner, marking it removed
+	 * while preserving historical attendance and membership records for future
+	 * reporting and data-retention cleanup.
+	 */
+	@Transactional
+	public void deleteOutlet(UUID currentUserId, UUID outletId) {
+		User owner = assertAcceptedOwner(outletId, currentUserId);
+		Outlet outlet = getActiveOutletOrThrow(outletId);
+
+		outlet.setRemovedAt(Instant.now());
+		outlet.setRemovedBy(owner);
+		outletRepository.save(outlet);
+		applicationMetrics.increment("outlet.deleted");
+		auditService.record(
+			currentUserId,
+			"OUTLET_DELETED",
+			"OUTLET",
+			outletId,
+			Map.of("name", outlet.getName())
+		);
+	}
+
 	private void recordMemberInvited(User inviter, OutletMembership membership) {
 		applicationMetrics.increment("outlet.membership.invited");
 		auditService.record(
@@ -380,6 +433,11 @@ public class OutletService {
 	private User getActiveUser(UUID userId) {
 		return userRepository.findByIdAndDeletedAtIsNull(userId)
 			.orElseThrow(() -> new ResourceNotFoundException("Authenticated user was not found"));
+	}
+
+	private Outlet getActiveOutletOrThrow(UUID outletId) {
+		return outletRepository.findByIdAndRemovedAtIsNull(outletId)
+			.orElseThrow(() -> new ResourceNotFoundException("Outlet not found: " + outletId));
 	}
 
 	private User assertAcceptedOwner(UUID outletId, UUID currentUserId) {

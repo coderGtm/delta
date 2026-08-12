@@ -94,7 +94,7 @@ class AuthServiceTest {
 		);
 
 		when(firebaseService.verifyIdToken("firebase-token")).thenReturn(userInfo);
-		when(userRepository.findByAuthUid("auth-uid")).thenReturn(Optional.of(user));
+		when(userRepository.findByAuthUidAndDeletedAtIsNull("auth-uid")).thenReturn(Optional.of(user));
 		when(jwtService.generateAccessToken(user)).thenReturn("access-token");
 		when(refreshTokenService.create(user)).thenReturn(issuedRefreshToken);
 		when(authMapper.toResponse(user, "access-token", "refresh-token")).thenReturn(expected);
@@ -124,7 +124,7 @@ class AuthServiceTest {
 		);
 
 		when(firebaseService.verifyIdToken("firebase-token")).thenReturn(userInfo);
-		when(userRepository.findByAuthUid("new-auth-uid")).thenReturn(Optional.empty());
+		when(userRepository.findByAuthUidAndDeletedAtIsNull("new-auth-uid")).thenReturn(Optional.empty());
 		when(userService.createUser("new-auth-uid", "New User", "new@example.com", "+911111111111")).thenReturn(user);
 		when(jwtService.generateAccessToken(user)).thenReturn("access-token");
 		when(refreshTokenService.create(user)).thenReturn(issuedRefreshToken);
@@ -134,6 +134,36 @@ class AuthServiceTest {
 
 		assertThat(response).isEqualTo(expected);
 		verify(userService).createUser("new-auth-uid", "New User", "new@example.com", "+911111111111");
+	}
+
+	@Test
+	void loginWithSoftDeletedUserCreatesFreshAccount() throws Exception {
+		FirebaseUserInfo userInfo = new FirebaseUserInfo("old-uid", "Gautam", "gautam@example.com", "+911234567890");
+		User freshUser = user("old-uid", "Gautam", "gautam@example.com", "+911234567890");
+		RefreshTokenService.IssuedRefreshToken issuedRefreshToken =
+			new RefreshTokenService.IssuedRefreshToken(freshUser, "refresh-token", Instant.now().plusSeconds(60));
+
+		when(firebaseService.verifyIdToken("firebase-token")).thenReturn(userInfo);
+		when(userRepository.findByAuthUidAndDeletedAtIsNull("old-uid")).thenReturn(Optional.empty());
+		when(userService.createUser("old-uid", "Gautam", "gautam@example.com", "+911234567890")).thenReturn(freshUser);
+		when(jwtService.generateAccessToken(freshUser)).thenReturn("access-token");
+		when(refreshTokenService.create(freshUser)).thenReturn(issuedRefreshToken);
+		when(authMapper.toResponse(freshUser, "access-token", "refresh-token")).thenReturn(
+			new LoginResponse(
+				freshUser.getId(),
+				freshUser.getName(),
+				freshUser.getEmail(),
+				freshUser.getPhone(),
+				"access-token",
+				"refresh-token",
+				freshUser.getCreatedAt(),
+				freshUser.getUpdatedAt()
+			)
+		);
+
+		authService.login(new LoginRequest("firebase-token"));
+
+		verify(userService).createUser("old-uid", "Gautam", "gautam@example.com", "+911234567890");
 	}
 
 	@Test

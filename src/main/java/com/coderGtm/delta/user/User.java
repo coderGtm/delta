@@ -47,4 +47,11 @@ public class User extends BaseEntity {
 	private String phone;
 
 	private Instant deletedAt;
+
+	/**
+	 * Preserves the last known email after account deletion so the unique email
+	 * constraint stays satisfied while the active email column is freed up for a
+	 * future account that reuses the same provider email.
+	 */
+	private String historicalEmail;
 }

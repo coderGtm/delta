@@ -51,7 +51,7 @@ public class AuthService {
 		}
 
 		User user = userRepository
-			.findByAuthUid(userInfo.uid())
+			.findByAuthUidAndDeletedAtIsNull(userInfo.uid())
 			.orElseGet(() -> userService.createUser(
 				userInfo.uid(),
 				userInfo.name(),

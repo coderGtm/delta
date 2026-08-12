@@ -133,6 +133,8 @@ Examples:
 /api/v1/outlets
 /api/v1/outlets/{outletId}/attendance
 /api/v1/outlets/{outletId}/reports/salary
+/api/v1/outlets/{outletId}/leave
+/api/v1/users/me
 ```
 
 ## Database migrations

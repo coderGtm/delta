@@ -19,4 +19,10 @@ public abstract class ApiException extends RuntimeException {
 		this.code = code;
 		this.status = status;
 	}
+
+	protected ApiException(String code, HttpStatus status, String message, Throwable cause) {
+		super(message, cause);
+		this.code = code;
+		this.status = status;
+	}
 }

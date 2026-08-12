@@ -62,6 +62,8 @@ Local application user domain.
 
 ```text
 user
+ ├── controller
+ │    └── UserController
  ├── dto
  ├── User
  ├── UserRepository
@@ -100,6 +102,7 @@ outlet
 Notes:
 - Outlet memberships are explicit join entities.
 - Membership removal is soft removal via `removedAt` / `removedBy`.
+- Outlets soft-delete via `removedAt` / `removedBy`; deleting an outlet does not remove its memberships.
 - Owners can toggle `geofenceEnabled` per outlet.
 
 ### `attendance`

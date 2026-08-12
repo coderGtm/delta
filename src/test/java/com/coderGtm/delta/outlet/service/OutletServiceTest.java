@@ -102,7 +102,7 @@ class OutletServiceTest {
 
 		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
 			.thenReturn(Optional.of(ownerMembership));
-		when(outletRepository.findById(outletId)).thenReturn(Optional.of(outlet));
+		when(outletRepository.findByIdAndRemovedAtIsNull(outletId)).thenReturn(Optional.of(outlet));
 		when(outletRepository.save(outlet)).thenReturn(outlet);
 
 		OutletResponse response = outletService.updateOutlet(
@@ -126,7 +126,7 @@ class OutletServiceTest {
 
 		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
 			.thenReturn(Optional.of(ownerMembership));
-		when(outletRepository.findById(outletId)).thenReturn(Optional.of(outlet));
+		when(outletRepository.findByIdAndRemovedAtIsNull(outletId)).thenReturn(Optional.of(outlet));
 		when(outletRepository.save(outlet)).thenReturn(outlet);
 
 		OutletResponse response = outletService.updateOutletGeofence(
@@ -155,7 +155,7 @@ class OutletServiceTest {
 			.thenReturn(Optional.of(ownerMembership));
 		when(userRepository.findByEmailIgnoreCaseAndDeletedAtIsNull("employee@example.com")).thenReturn(Optional.of(employee));
 		when(outletMembershipRepository.findByOutlet_IdAndUser_Id(outletId, employeeId)).thenReturn(Optional.empty());
-		when(outletRepository.findById(outletId)).thenReturn(Optional.of(outlet));
+		when(outletRepository.findByIdAndRemovedAtIsNull(outletId)).thenReturn(Optional.of(outlet));
 		when(outletMembershipRepository.save(any(OutletMembership.class))).thenReturn(savedInvite);
 		when(outletMembershipRepository.findDetailedByIdAndRemovedAtIsNull(savedInvite.getId())).thenReturn(Optional.of(savedInvite));
 
@@ -257,7 +257,7 @@ class OutletServiceTest {
 		Outlet outlet = outlet(UUID.randomUUID(), "Outlet A");
 		OutletMembership invite = membership(UUID.randomUUID(), outlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.INVITED);
 		invite.setInvitedBy(owner);
-		when(outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNull(
+		when(outletMembershipRepository.findAllByUser_IdAndStatusAndRemovedAtIsNullAndOutlet_RemovedAtIsNull(
 			userId,
 			OutletMembershipStatus.INVITED,
 			PageRequest.of(0, 20, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "updatedAt"))
@@ -286,6 +286,7 @@ class OutletServiceTest {
 
 		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
 			.thenReturn(Optional.of(ownerMembership));
+		when(outletRepository.findByIdAndRemovedAtIsNull(outletId)).thenReturn(Optional.of(outlet));
 		when(outletMembershipRepository.findDetailedByIdAndRemovedAtIsNull(membershipId))
 			.thenReturn(Optional.of(employeeMembership));
 
@@ -308,12 +309,91 @@ class OutletServiceTest {
 
 		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
 			.thenReturn(Optional.of(ownerMembership));
+		when(outletRepository.findByIdAndRemovedAtIsNull(outletId)).thenReturn(Optional.of(outlet));
 		when(outletMembershipRepository.findDetailedByIdAndRemovedAtIsNull(membershipId))
 			.thenReturn(Optional.of(targetOwnerMembership));
 
 		assertThatThrownBy(() -> outletService.removeMembership(ownerId, outletId, membershipId))
 			.isInstanceOf(BadRequestException.class)
 			.hasMessage("Owner memberships cannot be removed through this endpoint");
+	}
+
+	@Test
+	void leaveOutletSoftDeletesOwnEmployeeMembership() {
+		UUID outletId = UUID.randomUUID();
+		UUID employeeId = UUID.randomUUID();
+		UUID membershipId = UUID.randomUUID();
+		User employee = user(employeeId, "employee@example.com", "Employee");
+		Outlet outlet = outlet(outletId, "Outlet A");
+		OutletMembership employeeMembership = membership(membershipId, outlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.ACCEPTED);
+
+		when(userRepository.findByIdAndDeletedAtIsNull(employeeId)).thenReturn(Optional.of(employee));
+		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, employeeId))
+			.thenReturn(Optional.of(employeeMembership));
+
+		outletService.leaveOutlet(employeeId, outletId);
+
+		assertThat(employeeMembership.getRemovedAt()).isNotNull();
+		assertThat(employeeMembership.getRemovedBy()).isEqualTo(employee);
+		verify(outletMembershipRepository).save(employeeMembership);
+	}
+
+	@Test
+	void leaveOutletRejectsOwnerMembership() {
+		UUID outletId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
+		UUID membershipId = UUID.randomUUID();
+		User owner = user(ownerId, "owner@example.com", "Owner");
+		Outlet outlet = outlet(outletId, "Outlet A");
+		OutletMembership ownerMembership = membership(membershipId, outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+
+		when(userRepository.findByIdAndDeletedAtIsNull(ownerId)).thenReturn(Optional.of(owner));
+		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
+			.thenReturn(Optional.of(ownerMembership));
+
+		assertThatThrownBy(() -> outletService.leaveOutlet(ownerId, outletId))
+			.isInstanceOf(BadRequestException.class)
+			.hasMessage("Owners cannot leave an outlet through this endpoint");
+	}
+
+	@Test
+	void deleteOutletSoftDeletesOutletAsOwner() {
+		UUID outletId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
+		User owner = user(ownerId, "owner@example.com", "Owner");
+		Outlet outlet = outlet(outletId, "Outlet A");
+		OutletMembership ownerMembership = membership(UUID.randomUUID(), outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+
+		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
+			.thenReturn(Optional.of(ownerMembership));
+		when(outletRepository.findByIdAndRemovedAtIsNull(outletId)).thenReturn(Optional.of(outlet));
+
+		outletService.deleteOutlet(ownerId, outletId);
+
+		assertThat(outlet.getRemovedAt()).isNotNull();
+		assertThat(outlet.getRemovedBy()).isEqualTo(owner);
+		verify(outletRepository).save(outlet);
+	}
+
+	@Test
+	void deleteOutletRejectsNonOwner() {
+		UUID outletId = UUID.randomUUID();
+		UUID employeeId = UUID.randomUUID();
+		User employee = user(employeeId, "employee@example.com", "Employee");
+		Outlet outlet = outlet(outletId, "Outlet A");
+		OutletMembership employeeMembership = membership(
+			UUID.randomUUID(),
+			outlet,
+			employee,
+			OutletRole.EMPLOYEE,
+			OutletMembershipStatus.ACCEPTED
+		);
+		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, employeeId))
+			.thenReturn(Optional.of(employeeMembership));
+
+		assertThatThrownBy(() -> outletService.deleteOutlet(employeeId, outletId))
+			.isInstanceOf(ForbiddenException.class)
+			.hasMessage("Only outlet owners can perform this action");
 	}
 
 	@Test
@@ -329,6 +409,7 @@ class OutletServiceTest {
 
 		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
 			.thenReturn(Optional.of(ownerMembership));
+		when(outletRepository.findByIdAndRemovedAtIsNull(outletId)).thenReturn(Optional.of(outlet));
 		when(outletMembershipRepository.findDetailedByIdAndRemovedAtIsNull(membershipId))
 			.thenReturn(Optional.of(employeeMembership));
 		when(outletMembershipRepository.save(employeeMembership)).thenReturn(employeeMembership);
@@ -382,6 +463,7 @@ class OutletServiceTest {
 
 		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
 			.thenReturn(Optional.of(ownerMembership));
+		when(outletRepository.findByIdAndRemovedAtIsNull(outletId)).thenReturn(Optional.of(outlet));
 		when(outletMembershipRepository.findDetailedByIdAndRemovedAtIsNull(membershipId))
 			.thenReturn(Optional.of(employeeMembership));
 

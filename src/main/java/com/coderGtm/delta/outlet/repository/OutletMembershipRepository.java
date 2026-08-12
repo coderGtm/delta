@@ -25,7 +25,7 @@ public interface OutletMembershipRepository extends JpaRepository<OutletMembersh
 	Optional<OutletMembership> findDetailedByIdAndRemovedAtIsNull(UUID id);
 
 	@EntityGraph(attributePaths = {"outlet", "user", "invitedBy", "removedBy"})
-	Page<OutletMembership> findAllByUser_IdAndStatusAndRemovedAtIsNull(
+	Page<OutletMembership> findAllByUser_IdAndStatusAndRemovedAtIsNullAndOutlet_RemovedAtIsNull(
 		UUID userId,
 		OutletMembershipStatus status,
 		Pageable pageable

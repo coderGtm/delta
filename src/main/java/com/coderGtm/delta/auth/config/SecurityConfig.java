@@ -14,10 +14,12 @@ import com.coderGtm.delta.auth.filter.JwtAuthenticationFilter;
 import com.coderGtm.delta.common.monitoring.PrometheusAccessProperties;
 import com.coderGtm.delta.common.web.ApiPaths;
 import com.coderGtm.delta.common.web.RateLimitingFilter;
+import com.coderGtm.delta.common.web.WebSecurityProperties;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 /**
  * Configures stateless security for the API.
@@ -28,7 +30,7 @@ import org.springframework.security.authorization.AuthorizationDecision;
  */
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(PrometheusAccessProperties.class)
+@EnableConfigurationProperties({PrometheusAccessProperties.class, WebSecurityProperties.class})
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -63,6 +65,19 @@ public class SecurityConfig {
 			)
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 			.addFilterAfter(rateLimitingFilter, JwtAuthenticationFilter.class)
+			.headers(headers -> headers
+				.frameOptions(frameOptions -> frameOptions.deny())
+				.referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+				.permissionsPolicyHeader(permissions -> permissions.policy(
+					"camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+				))
+				.contentSecurityPolicy(csp -> csp.policyDirectives(
+					"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+						+ "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
+						+ "connect-src 'self'; frame-ancestors 'none'"
+				))
+				.httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+			)
 			.build();
 	}
 

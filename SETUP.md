@@ -31,6 +31,7 @@ Important variables:
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Path to Firebase service-account JSON |
 | `JAVA_OPTS` | Optional JVM options for Docker runtime |
 | `FLYWAY_BASELINE_ON_MIGRATE` | Set to `true` once if adopting Flyway on an existing non-empty DB |
+| `TRUST_PROXY_HEADERS` | `true` only when behind a trusted reverse proxy that overwrites `X-Forwarded-For`/`X-Real-IP`; set `false` for direct exposure to prevent IP rate-limit spoofing |
 
 ## Local Docker Compose setup
 
@@ -354,6 +355,8 @@ Verifies the 429 boundaries from `RateLimitingFilter` (`loadtest/rate-limit.js`)
 - `POST /api/v1/outlets/{id}/attendance` → 20/min per user
 - Per-IP isolation via `X-Forwarded-For`
 
+Per-IP isolation relies on `TRUST_PROXY_HEADERS=true`, which is the compose default; if you set it to `false`, IP keys fall back to the socket remote address.
+
 ```bash
 k6 run loadtest/rate-limit.js
 ```
@@ -377,6 +380,19 @@ All scripts read the same env vars (defaults in `loadtest/config.js`):
 
 - The unthrottled read endpoint sustains thousands of requests/sec on a local machine, so the app is typically not the bottleneck for small deployments — Postgres connection pool size and the heaviest endpoints (salary `.xlsx` export, attendance writes) matter more.
 - Writes are intentionally capped by rate limits (e.g. 20 attendance entries/min/user), so those endpoints are bottlenecked by policy, not capacity.
+
+## Security hardening
+
+The API is a stateless JSON service. Defaults and how to tighten them for production:
+
+- **SQL injection** — not applicable: all persistence uses Spring Data derived/parameterized queries; there is no raw SQL.
+- **Excel formula injection** — user-supplied outlet names and member display names written to salary report cells are sanitized on export, so values beginning with `=`, `+`, `-`, `@`, or control characters are rendered as text, not evaluated.
+- **Response headers** — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, a same-origin `Content-Security-Policy`, and HTTP `Strict-Transport-Security` (HSTS) are applied.
+  - **HSTS only ships over HTTPS.** Because `server.forward-headers-strategy=framework` is set, the app emits HSTS only when the request is detected as secure (`X-Forwarded-Proto: https` from a trusted proxy). Plain HTTP local development (`http://localhost:8080`) receives no HSTS header, so local dev is unaffected.
+- **Request body limits** — Tomcat rejects request bodies above 2 MB.
+- **Proxy headers** — the app resolves client IPs from `X-Forwarded-For`/`X-Real-IP` only when `TRUST_PROXY_HEADERS=true`. Behind a public proxy, ensure it overwrites these headers from the trusted connection. When exposed directly, set `TRUST_PROXY_HEADERS=false` so the socket remote address is used and IP-based rate-limit keys cannot be spoofed.
+- **Rate limiting** — apply particularly to auth and write endpoints; the counters are in-memory (single instance). Move to Redis/gateway when scaling horizontally.
+- **`/actuator/prometheus`** — protected by a bearer token and intended for private monitoring networks only.
 
 ## Report generation
 

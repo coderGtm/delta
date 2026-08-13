@@ -26,7 +26,7 @@ class RateLimitingFilterTest {
 
 	@BeforeEach
 	void setUp() {
-		filter = new RateLimitingFilter();
+		filter = new RateLimitingFilter(new WebSecurityProperties(true));
 	}
 
 	@Test

@@ -15,6 +15,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -23,9 +24,12 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class RequestLoggingFilter extends OncePerRequestFilter {
 
 	private static final String REQUEST_ID_HEADER = "X-Request-Id";
+
+	private final WebSecurityProperties webSecurityProperties;
 
 	@Override
 	protected void doFilterInternal(
@@ -54,7 +58,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
 				request.getRequestURI(),
 				response.getStatus(),
 				durationMs,
-				ClientIpUtils.resolve(request),
+				ClientIpUtils.resolve(request, webSecurityProperties.trustProxyHeaders()),
 				requestId,
 				userId
 			);

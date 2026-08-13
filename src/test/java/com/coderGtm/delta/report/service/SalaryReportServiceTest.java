@@ -209,6 +209,48 @@ class SalaryReportServiceTest {
 	}
 
 	@Test
+	void generateSalaryReportExcelSanitizesFormulaInjectionInNames() throws Exception {
+		UUID outletId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
+		UUID employeeId = UUID.randomUUID();
+		Outlet outlet = outlet(outletId, "=1+2");
+		User owner = user(ownerId, "owner@example.com", "Owner");
+		User employee = user(employeeId, "employee@example.com", "Employee");
+		OutletMembership ownerMembership = membership(outlet, owner, OutletRole.OWNER, OutletMembershipStatus.ACCEPTED);
+		OutletMembership employeeMembership = membership(outlet, employee, OutletRole.EMPLOYEE, OutletMembershipStatus.ACCEPTED);
+		employeeMembership.setDisplayName("=HYPERLINK(\"http://evil\")");
+		Instant startTime = Instant.parse("2024-01-01T00:00:00Z");
+		Instant endTime = Instant.parse("2024-01-02T00:00:00Z");
+
+		when(outletMembershipRepository.findByOutlet_IdAndUser_IdAndRemovedAtIsNull(outletId, ownerId))
+			.thenReturn(Optional.of(ownerMembership));
+		when(outletMembershipRepository.findByOutlet_IdAndUser_Id(outletId, employeeId))
+			.thenReturn(Optional.of(employeeMembership));
+		when(attendanceEntryRepository.findAllByOutlet_IdAndUser_IdAndEntryTimeGreaterThanEqualAndEntryTimeLessThanOrderByEntryTimeAsc(
+			outletId,
+			employeeId,
+			startTime,
+			endTime
+		)).thenReturn(List.of());
+
+		byte[] workbookBytes = salaryReportService.generateSalaryReportExcel(
+			ownerId,
+			outletId,
+			employeeId,
+			startTime,
+			endTime,
+			"Asia/Kolkata",
+			new BigDecimal("120.00")
+		);
+
+		try (Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(workbookBytes))) {
+			assertThat(workbook.getSheetAt(0).getRow(1).getCell(1).getStringCellValue()).isEqualTo("'=1+2");
+			assertThat(workbook.getSheetAt(0).getRow(1).getCell(3).getStringCellValue())
+				.isEqualTo("'=HYPERLINK(\"http://evil\") <employee@example.com>");
+		}
+	}
+
+	@Test
 	void calculateSalaryReportRejectsNonOwner() {
 		UUID outletId = UUID.randomUUID();
 		UUID employeeId = UUID.randomUUID();

@@ -12,17 +12,28 @@ public final class ClientIpUtils {
 	}
 
 	/**
-	 * Resolves the originating client IP from forwarded headers when present.
+	 * Resolves the originating client IP, honoring proxy headers by default.
 	 */
 	public static String resolve(HttpServletRequest request) {
-		String forwardedFor = request.getHeader("X-Forwarded-For");
-		if (forwardedFor != null && !forwardedFor.isBlank()) {
-			return forwardedFor.split(",")[0].trim();
-		}
+		return resolve(request, true);
+	}
 
-		String realIp = request.getHeader("X-Real-IP");
-		if (realIp != null && !realIp.isBlank()) {
-			return realIp.trim();
+	/**
+	 * Resolves the originating client IP from forwarded headers only when
+	 * {@code trustProxyHeaders} is true, otherwise uses the socket remote
+	 * address to prevent header spoofing.
+	 */
+	public static String resolve(HttpServletRequest request, boolean trustProxyHeaders) {
+		if (trustProxyHeaders) {
+			String forwardedFor = request.getHeader("X-Forwarded-For");
+			if (forwardedFor != null && !forwardedFor.isBlank()) {
+				return forwardedFor.split(",")[0].trim();
+			}
+
+			String realIp = request.getHeader("X-Real-IP");
+			if (realIp != null && !realIp.isBlank()) {
+				return realIp.trim();
+			}
 		}
 
 		return request.getRemoteAddr();

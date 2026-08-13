@@ -13,6 +13,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import com.coderGtm.delta.common.audit.entity.AuditEvent;
 import com.coderGtm.delta.common.audit.repository.AuditEventRepository;
 import com.coderGtm.delta.common.web.ClientIpUtils;
+import com.coderGtm.delta.common.web.WebSecurityProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -27,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 public class AuditService {
 
 	private final AuditEventRepository auditEventRepository;
+	private final WebSecurityProperties webSecurityProperties;
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	/**
@@ -43,7 +45,7 @@ public class AuditService {
 
 		HttpServletRequest request = currentRequest();
 		if (request != null) {
-			event.setIpAddress(ClientIpUtils.resolve(request));
+			event.setIpAddress(ClientIpUtils.resolve(request, webSecurityProperties.trustProxyHeaders()));
 			event.setUserAgent(truncate(request.getHeader("User-Agent"), 500));
 		}
 

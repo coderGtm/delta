@@ -336,10 +336,30 @@ public class SalaryReportService {
 
 	private void createCell(Row row, int column, String value, CellStyle style) {
 		Cell cell = row.createCell(column);
-		cell.setCellValue(value);
+		cell.setCellValue(sanitizeCellValue(value));
 		if (style != null) {
 			cell.setCellStyle(style);
 		}
+	}
+
+	/**
+	 * Defends against spreadsheet formula injection (CWE-1236). Leading cells
+	 * such as {@code =}, {@code +}, {@code -}, {@code @} or control characters
+	 * are interpreted as formulas by spreadsheet applications. Prefixing such
+	 * values with a single quote forces them to be treated as literal text while
+	 * presenting the original value on output.
+	 */
+	private String sanitizeCellValue(String value) {
+		if (value == null || value.isEmpty()) {
+			return value;
+		}
+
+		char first = value.charAt(0);
+		if (first == '=' || first == '+' || first == '-' || first == '@'
+			|| first <= 0x20 || first == 0x7F) {
+			return "'" + value;
+		}
+		return value;
 	}
 
 	private void createCell(Row row, int column, BigDecimal value, CellStyle style) {

@@ -48,6 +48,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 	private final ObjectMapper objectMapper = JsonMapper.builder().addModule(new JavaTimeModule()).build();
 	private final AntPathMatcher pathMatcher = new AntPathMatcher();
 	private final Map<String, WindowCounter> counters = new ConcurrentHashMap<>();
+	private final WebSecurityProperties webSecurityProperties;
 
 	private final List<RateLimitPolicy> policies = List.of(
 		new RateLimitPolicy("POST", ApiPaths.AUTH + "/login", 10, Duration.ofMinutes(1), KeyStrategy.IP),
@@ -75,7 +76,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 			return;
 		}
 
-		String key = policy.keyStrategy().resolve(request);
+		String key = policy.keyStrategy().resolve(request, webSecurityProperties.trustProxyHeaders());
 		String counterKey = policy.httpMethod() + ':' + policy.pathPattern() + ':' + key;
 		WindowCounter counter = counters.compute(counterKey, (ignored, existing) -> nextCounter(existing, policy));
 
@@ -123,13 +124,13 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 	private enum KeyStrategy {
 		IP {
 			@Override
-			String resolve(HttpServletRequest request) {
-				return ClientIpUtils.resolve(request);
+			String resolve(HttpServletRequest request, boolean trustProxyHeaders) {
+				return ClientIpUtils.resolve(request, trustProxyHeaders);
 			}
 		},
 		USER_OR_IP {
 			@Override
-			String resolve(HttpServletRequest request) {
+			String resolve(HttpServletRequest request, boolean trustProxyHeaders) {
 				Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 				if (authentication != null
 					&& authentication.isAuthenticated()
@@ -138,11 +139,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 					&& user.getId() != null) {
 					return user.getId().toString();
 				}
-				return ClientIpUtils.resolve(request);
+				return ClientIpUtils.resolve(request, trustProxyHeaders);
 			}
 		};
 
-		abstract String resolve(HttpServletRequest request);
+		abstract String resolve(HttpServletRequest request, boolean trustProxyHeaders);
 	}
 
 	private record RateLimitPolicy(

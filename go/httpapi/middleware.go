@@ -12,8 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const requestIDKey ctxKey = iota
-
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimSpace(r.Header.Get("X-Request-Id"))
@@ -103,12 +101,13 @@ func BodyLimit(maxBytes int64) func(http.Handler) http.Handler {
 
 func ClientIP(r *http.Request, trustProxyHeaders bool) string {
 	if trustProxyHeaders {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			parts := strings.Split(xff, ",")
-			return strings.TrimSpace(parts[0])
+		if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
+			if first := strings.TrimSpace(strings.SplitN(xff, ",", 2)[0]); first != "" {
+				return first
+			}
 		}
-		if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
-			return strings.TrimSpace(realIP)
+		if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
+			return realIP
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

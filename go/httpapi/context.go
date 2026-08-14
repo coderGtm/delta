@@ -7,7 +7,10 @@ import (
 
 type ctxKey int
 
-const subjectKey ctxKey = iota
+const (
+	subjectKey ctxKey = iota
+	requestIDKey
+)
 
 // Subject is implemented by the authenticated user model (db.User) and
 // anything else that needs to be attached to the request context.

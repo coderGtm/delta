@@ -1,3 +1,4 @@
+// Package audit records business audit events to the database.
 package audit
 
 import (
@@ -11,14 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// Recorder writes audit events to the database.
 type Recorder struct {
 	store *db.Store
 }
 
+// NewRecorder returns a Recorder that writes events through the given store.
 func NewRecorder(store *db.Store) *Recorder { return &Recorder{store: store} }
 
-// Record persists an audit event in its own transaction so a failure here
-// never rolls back the business write. Failures are logged and dropped.
+// Record best-effort persists an audit event in its own transaction, so a
+// failure here never rolls back the business write. It never returns an error;
+// failures are logged and dropped.
 func (r *Recorder) Record(ctx context.Context, actorUserID, action, entityType string, entityID uuid.UUID, metadata map[string]any, ip, userAgent string) {
 	var metaJSON []byte
 	var err error

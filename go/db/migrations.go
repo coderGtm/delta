@@ -15,6 +15,9 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
+// Migrate applies the SQL migrations embedded in the binary to the database at
+// the given URL. migrate.ErrNoChange is treated as success when the schema is
+// already up to date.
 func Migrate(ctx context.Context, url string) error {
 	sqlDB, err := sql.Open("pgx", url)
 	if err != nil {

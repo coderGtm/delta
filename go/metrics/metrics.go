@@ -1,3 +1,4 @@
+// Package metrics provides a Prometheus registry for business counters.
 package metrics
 
 import (
@@ -9,12 +10,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// Registry is a Prometheus registry for business counters, safe for
+// concurrent use.
 type Registry struct {
 	mu       sync.Mutex
 	counters map[string]*prometheus.CounterVec
 	reg      *prometheus.Registry
 }
 
+// NewRegistry returns a Registry preloaded with the Go and process collectors.
 func NewRegistry() *Registry {
 	r := &Registry{
 		counters: make(map[string]*prometheus.CounterVec),
@@ -55,4 +59,6 @@ func labelValues(tags []string) []string {
 	return vals
 }
 
+// Handler returns an HTTP handler that exposes the registry in the Prometheus
+// text format.
 func (r *Registry) Handler() http.Handler { return promhttp.HandlerFor(r.reg, promhttp.HandlerOpts{}) }

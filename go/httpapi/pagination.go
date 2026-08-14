@@ -6,18 +6,24 @@ import (
 	"strings"
 )
 
+// SortOrder is a single requested sort: a field name and whether it should be
+// applied in descending order.
 type SortOrder struct {
-	Field string
-	Desc  bool
+	Field string // Requested sort field.
+	Desc  bool   // Whether to sort in descending order.
 }
 
+// PageParams holds the parsed pagination and sort parameters of a request.
 type PageParams struct {
-	Page   int
-	Size   int
-	Sorted bool
-	Sort   []SortOrder
+	Page   int         // Zero-based page number.
+	Size   int         // Number of items per page.
+	Sorted bool        // Whether at least one sort field was requested.
+	Sort   []SortOrder // Requested sorts, in order.
 }
 
+// ParsePageParams extracts page, size, and sort parameters from the request
+// query string. Invalid or out-of-range values fall back to defaults (page 0,
+// size 20).
 func ParsePageParams(r *http.Request) PageParams {
 	p := PageParams{Page: 0, Size: 20}
 	if v := r.URL.Query().Get("page"); v != "" {

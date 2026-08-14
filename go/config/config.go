@@ -1,3 +1,4 @@
+// Package config loads the service configuration from environment variables.
 package config
 
 import (
@@ -7,20 +8,21 @@ import (
 	"time"
 )
 
+// Config holds the service configuration loaded from environment variables.
 type Config struct {
-	Port                       int
-	DatabaseURL                string
-	AutoMigrate                bool
-	JWTSecret                  string
-	AccessTokenTTL             time.Duration
-	RefreshTokenTTL            time.Duration
-	RefreshCleanupInterval     time.Duration
-	RefreshRevokedRetention    time.Duration
-	FirebaseServiceAccountPath string
-	PrometheusBearerToken      string
-	TrustProxyHeaders          bool
-	LogLevel                   string
-	LogFormat                  string
+	Port                       int           // HTTP listen port.
+	DatabaseURL                string        // PostgreSQL connection URL.
+	AutoMigrate                bool          // Whether to apply migrations automatically at startup.
+	JWTSecret                  string        // Secret used to sign access and refresh tokens.
+	AccessTokenTTL             time.Duration // Access token lifetime.
+	RefreshTokenTTL            time.Duration // Refresh token lifetime.
+	RefreshCleanupInterval     time.Duration // How often expired tokens are cleaned up.
+	RefreshRevokedRetention    time.Duration // How long revoked tokens are kept before permanent deletion.
+	FirebaseServiceAccountPath string        // Path to the Firebase service account JSON file.
+	PrometheusBearerToken      string        // Bearer token required to access the metrics endpoint.
+	TrustProxyHeaders          bool          // Whether X-Forwarded-For and X-Real-IP headers are honored.
+	LogLevel                   string        // Log level, e.g. "info" or "debug".
+	LogFormat                  string        // Log output format, "text" or "json".
 }
 
 func getEnv(key, def string) string {
@@ -58,6 +60,9 @@ func getEnvDurationMillis(key string, def time.Duration) time.Duration {
 	return def
 }
 
+// Load reads the service configuration from environment variables, applying
+// defaults where a variable is unset. It returns an error when JWT_SECRET is
+// not set.
 func Load() (Config, error) {
 	cfg := Config{
 		Port:                       getEnvInt("PORT", 8080),

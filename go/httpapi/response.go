@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// WriteJSON writes v to w as a JSON response with the given status code.
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -16,6 +17,9 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
+// WriteError writes an error response. An *APIError is rendered with its
+// status, code, and message; any other error is logged and rendered as a 500
+// Internal Server Error.
 func WriteError(w http.ResponseWriter, err error) {
 	var apiErr *APIError
 	if errors.As(err, &apiErr) {
@@ -26,19 +30,21 @@ func WriteError(w http.ResponseWriter, err error) {
 	WriteJSON(w, http.StatusInternalServerError, ErrorResponse{"INTERNAL_ERROR", "Internal server error", time.Now().UTC()})
 }
 
-// PageResponse mirrors the Java PageResponse record shape; field declaration
-// order determines JSON key order.
+// PageResponse is the paginated API response wrapper; field declaration order
+// defines JSON key order.
 type PageResponse[T any] struct {
-	Content       []T   `json:"content"`
-	Page          int   `json:"page"`
-	Size          int   `json:"size"`
-	TotalElements int64 `json:"totalElements"`
-	TotalPages    int   `json:"totalPages"`
-	First         bool  `json:"first"`
-	Last          bool  `json:"last"`
-	Empty         bool  `json:"empty"`
+	Content       []T   `json:"content"`       // Items for the requested page.
+	Page          int   `json:"page"`          // Zero-based page number.
+	Size          int   `json:"size"`          // Number of items per page.
+	TotalElements int64 `json:"totalElements"` // Total number of items across all pages.
+	TotalPages    int   `json:"totalPages"`    // Total number of pages.
+	First         bool  `json:"first"`         // Whether this is the first page.
+	Last          bool  `json:"last"`          // Whether this is the last page.
+	Empty         bool  `json:"empty"`         // Whether the page has no items.
 }
 
+// WritePage writes a paginated response derived from the page content, the
+// total element count, and the request's page parameters.
 func WritePage[T any](w http.ResponseWriter, content []T, total int64, p PageParams) {
 	totalPages := 0
 	if total > 0 {

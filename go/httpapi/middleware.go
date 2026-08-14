@@ -12,6 +12,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// RequestID ensures every request carries an X-Request-Id, reusing an incoming
+// header value or generating a new UUID when absent, and makes the ID available
+// to downstream handlers.
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimSpace(r.Header.Get("X-Request-Id"))
@@ -23,10 +26,14 @@ func RequestID(next http.Handler) http.Handler {
 	})
 }
 
+// WithRequestID returns a copy of r with the given request ID attached to its
+// context.
 func WithRequestID(r *http.Request, id string) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), requestIDKey, id))
 }
 
+// RequestIDFrom returns the request ID attached to r's context, or "" if none
+// is present.
 func RequestIDFrom(r *http.Request) string {
 	if id, ok := r.Context().Value(requestIDKey).(string); ok {
 		return id
@@ -44,6 +51,8 @@ func (r *statusRecorder) WriteHeader(status int) {
 	r.ResponseWriter.WriteHeader(status)
 }
 
+// RequestLog returns middleware that logs a completion line for each request
+// with its status, duration, client IP, request ID, and authenticated user ID.
 func RequestLog(logger *slog.Logger, trustProxyHeaders bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +70,8 @@ func RequestLog(logger *slog.Logger, trustProxyHeaders bool) func(http.Handler) 
 	}
 }
 
+// Recoverer returns middleware that recovers panics in downstream handlers and
+// responds with a 500 Internal Server Error instead of crashing the process.
 func Recoverer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -73,6 +84,8 @@ func Recoverer(next http.Handler) http.Handler {
 	})
 }
 
+// SecurityHeaders returns middleware that sets recommended security response
+// headers on every response.
 func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -86,6 +99,9 @@ func SecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
+// BodyLimit returns middleware that rejects requests whose declared
+// Content-Length exceeds maxBytes and enforces the limit on the body via
+// http.MaxBytesReader.
 func BodyLimit(maxBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -99,6 +115,9 @@ func BodyLimit(maxBytes int64) func(http.Handler) http.Handler {
 	}
 }
 
+// ClientIP returns the client IP address. When trustProxyHeaders is true the
+// X-Forwarded-For and X-Real-IP headers are honored; otherwise the connection
+// peer address is used.
 func ClientIP(r *http.Request, trustProxyHeaders bool) string {
 	if trustProxyHeaders {
 		if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {

@@ -1,8 +1,3 @@
-// Package auth implements authentication primitives: the JWT access-token
-// signing and verification service, the refresh-token lifecycle of creation,
-// validation, rotation, revocation, and cleanup, a Firebase ID-token wrapper,
-// the auth business service, and the HTTP middleware and handlers that expose
-// them.
 package auth
 
 import (

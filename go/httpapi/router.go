@@ -6,13 +6,18 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/coderGtm/delta/go/config"
 )
 
 // NewRouter registers the health, readiness, and metrics endpoints on mux and
-// wraps it in the request middleware chain. The ready func is injected by main;
-// it currently pings the database. metricsHandler is exposed under /metrics,
-// gated by a bearer token when prometheusToken is non-empty.
-func NewRouter(logger *slog.Logger, trustProxyHeaders bool, prometheusToken string, ready func(ctx context.Context) error, metricsHandler http.Handler, mux *http.ServeMux) http.Handler {
+// wraps it in the request middleware chain. The ready func is injected by
+// main; it currently pings the database. metricsHandler is exposed under
+// /metrics, gated by a bearer token when cfg.PrometheusBearerToken is
+// non-empty. attach applies domain-specific authentication middleware between
+// the request log and the mux, so authenticated subjects are resolved before
+// any request-completion logging line runs.
+func NewRouter(logger *slog.Logger, cfg config.Config, ready func(ctx context.Context) error, metricsHandler http.Handler, attach func(http.Handler) http.Handler, mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusOK, map[string]string{"status": "UP"})
 	})
@@ -24,13 +29,13 @@ func NewRouter(logger *slog.Logger, trustProxyHeaders bool, prometheusToken stri
 		WriteJSON(w, http.StatusOK, map[string]string{"status": "UP"})
 	})
 	if metricsHandler != nil {
-		if prometheusToken != "" {
-			mux.Handle("GET /metrics", prometheusAuth(prometheusToken, metricsHandler))
+		if cfg.PrometheusBearerToken != "" {
+			mux.Handle("GET /metrics", prometheusAuth(cfg.PrometheusBearerToken, metricsHandler))
 		} else {
 			mux.Handle("GET /metrics", metricsHandler)
 		}
 	}
-	return Recoverer(SecurityHeaders(BodyLimit(2 << 20)(RequestID(RequestLog(logger, trustProxyHeaders)(mux)))))
+	return Recoverer(SecurityHeaders(BodyLimit(2 << 20)(RequestID(RequestLog(logger, cfg.TrustProxyHeaders)(attach(mux))))))
 }
 
 // prometheusAuth guards the metrics handler, requiring an Authorization header

@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+// DecodeJSON decodes the request body into dst. A body that is not valid JSON
+// yields a 400 Bad Request error.
+func DecodeJSON(r *http.Request, dst any) error {
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		return BadRequest("Malformed request body")
+	}
+	return nil
+}
+
 // WriteJSON writes v to w as a JSON response with the given status code.
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

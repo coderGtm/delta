@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coderGtm/delta/go/audit"
+	"github.com/coderGtm/delta/go/auth"
 	"github.com/coderGtm/delta/go/config"
 	"github.com/coderGtm/delta/go/db"
 	"github.com/coderGtm/delta/go/httpapi"
@@ -43,14 +45,31 @@ func main() {
 
 	registry := metrics.NewRegistry()
 
+	store := db.NewStore(pool)
+
+	fb, err := auth.NewFirebaseClient(ctx, cfg.FirebaseServiceAccountPath)
+	if err != nil {
+		logger.Warn("firebase client unavailable; login will reject tokens", "err", err, "path", cfg.FirebaseServiceAccountPath)
+	}
+	jwtSvc := auth.NewJWTService(cfg.JWTSecret, cfg.AccessTokenTTL)
+	refreshSvc := auth.NewRefreshTokenService(store, cfg.RefreshTokenTTL, cfg.RefreshRevokedRetention)
+	recorder := audit.NewRecorder(store)
+	authSvc := auth.NewService(store, fb, jwtSvc, refreshSvc, recorder, registry)
+	authHandlers := &auth.Handlers{Svc: authSvc, TrustProxy: cfg.TrustProxyHeaders}
+
 	apiMux := http.NewServeMux()
-	// API routes are registered here by later tasks.
+	apiMux.Handle("POST /api/v1/auth/login", http.HandlerFunc(authHandlers.Login))
+	apiMux.Handle("POST /api/v1/auth/refresh", http.HandlerFunc(authHandlers.Refresh))
+	apiMux.Handle("POST /api/v1/auth/logout", http.HandlerFunc(authHandlers.Logout))
+	apiMux.Handle("POST /api/v1/auth/logout-all", auth.Require(http.HandlerFunc(authHandlers.LogoutAll)))
+
+	go refreshSvc.RunCleanupTicker(ctx, cfg.RefreshCleanupInterval)
 
 	ready := func(ctx context.Context) error {
 		return pool.Ping(ctx)
 	}
 
-	handler := httpapi.NewRouter(logger, cfg.TrustProxyHeaders, cfg.PrometheusBearerToken, ready, registry.Handler(), apiMux)
+	handler := httpapi.NewRouter(logger, cfg, ready, registry.Handler(), auth.AttachUser(jwtSvc, store), apiMux)
 
 	srv := &http.Server{
 		Addr:              ":" + strconv.Itoa(cfg.Port),

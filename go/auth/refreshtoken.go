@@ -102,17 +102,29 @@ func (s *RefreshTokenService) Revoke(ctx context.Context, raw string) error {
 	return err
 }
 
+// RotateWithUser validates raw, revokes it, and issues a fresh token for the
+// same user, returning the new raw token and the user the old token belonged
+// to.
+func (s *RefreshTokenService) RotateWithUser(ctx context.Context, raw string) (string, uuid.UUID, error) {
+	row, err := s.validate(ctx, raw)
+	if err != nil {
+		return "", uuid.Nil, err
+	}
+	if _, err := s.store.Querier().UpdateRefreshTokenRevoked(ctx, db.UpdateRefreshTokenRevokedParams{ID: row.ID, Revoked: true}); err != nil {
+		return "", uuid.Nil, err
+	}
+	newRaw, err := s.Create(ctx, uuid.UUID(row.UserID.Bytes))
+	if err != nil {
+		return "", uuid.Nil, err
+	}
+	return newRaw, uuid.UUID(row.UserID.Bytes), nil
+}
+
 // Rotate validates raw, revokes it, and issues a fresh token for the same
 // user, returning the new raw token.
 func (s *RefreshTokenService) Rotate(ctx context.Context, raw string) (string, error) {
-	row, err := s.validate(ctx, raw)
-	if err != nil {
-		return "", err
-	}
-	if _, err := s.store.Querier().UpdateRefreshTokenRevoked(ctx, db.UpdateRefreshTokenRevokedParams{ID: row.ID, Revoked: true}); err != nil {
-		return "", err
-	}
-	return s.Create(ctx, uuid.UUID(row.UserID.Bytes))
+	newRaw, _, err := s.RotateWithUser(ctx, raw)
+	return newRaw, err
 }
 
 // RevokeAllForUser revokes every non-revoked refresh token belonging to

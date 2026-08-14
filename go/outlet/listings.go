@@ -85,7 +85,7 @@ LIMIT $3 OFFSET $4`
 // outletMembershipsSQL lists the non-removed memberships of an outlet together
 // with each member's user and inviter. The %s placeholder is replaced with a
 // whitelisted ORDER BY clause.
-const outletMembershipsSQL = `SELECT m.id AS membership_id, m.outlet_id AS outlet_id, m.role AS role, m.status AS status,
+const outletMembershipsSQL = `SELECT m.id AS membership_id, m.outlet_id AS outlet_id, m.user_id AS user_id, m.role AS role, m.status AS status,
 	m.display_name AS display_name, m.invited_by_user_id AS invited_by_user_id,
 	m.created_at AS created_at, m.updated_at AS updated_at,
 	u.id AS member_user_id, u.name AS user_name, u.email AS user_email,

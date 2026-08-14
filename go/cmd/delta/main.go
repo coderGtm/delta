@@ -16,6 +16,7 @@ import (
 	"github.com/coderGtm/delta/go/db"
 	"github.com/coderGtm/delta/go/httpapi"
 	"github.com/coderGtm/delta/go/metrics"
+	"github.com/coderGtm/delta/go/outlet"
 	"github.com/coderGtm/delta/go/user"
 )
 
@@ -66,6 +67,23 @@ func main() {
 
 	userHandlers := user.NewHandler(authSvc, store, cfg.TrustProxyHeaders)
 	apiMux.Handle("DELETE /api/v1/users/me", auth.Require(http.HandlerFunc(userHandlers.DeleteMe)))
+
+	outletSvc := outlet.NewService(store, recorder, registry)
+	outletHandlers := &outlet.Handlers{Svc: outletSvc, TrustProxy: cfg.TrustProxyHeaders}
+	apiMux.Handle("POST /api/v1/outlets", auth.Require(http.HandlerFunc(outletHandlers.CreateOutlet)))
+	apiMux.Handle("GET /api/v1/outlets/{outletId}", auth.Require(http.HandlerFunc(outletHandlers.GetOutlet)))
+	apiMux.Handle("PUT /api/v1/outlets/{outletId}", auth.Require(http.HandlerFunc(outletHandlers.UpdateOutlet)))
+	apiMux.Handle("PUT /api/v1/outlets/{outletId}/geofence", auth.Require(http.HandlerFunc(outletHandlers.UpdateGeofence)))
+	apiMux.Handle("GET /api/v1/outlets/mine", auth.Require(http.HandlerFunc(outletHandlers.GetMyOutlets)))
+	apiMux.Handle("GET /api/v1/outlets/invites", auth.Require(http.HandlerFunc(outletHandlers.GetMyInvites)))
+	apiMux.Handle("GET /api/v1/outlets/{outletId}/memberships", auth.Require(http.HandlerFunc(outletHandlers.GetOutletMemberships)))
+	apiMux.Handle("DELETE /api/v1/outlets/{outletId}", auth.Require(http.HandlerFunc(outletHandlers.DeleteOutlet)))
+	apiMux.Handle("POST /api/v1/outlets/{outletId}/leave", auth.Require(http.HandlerFunc(outletHandlers.LeaveOutlet)))
+	apiMux.Handle("POST /api/v1/outlets/{outletId}/memberships/invite", auth.Require(http.HandlerFunc(outletHandlers.InviteMember)))
+	apiMux.Handle("DELETE /api/v1/outlets/{outletId}/memberships/{membershipId}", auth.Require(http.HandlerFunc(outletHandlers.RemoveMembership)))
+	apiMux.Handle("PUT /api/v1/outlets/{outletId}/memberships/{membershipId}/display-name", auth.Require(http.HandlerFunc(outletHandlers.UpdateDisplayName)))
+	apiMux.Handle("POST /api/v1/outlets/memberships/{membershipId}/accept", auth.Require(http.HandlerFunc(outletHandlers.AcceptInvite)))
+	apiMux.Handle("POST /api/v1/outlets/memberships/{membershipId}/reject", auth.Require(http.HandlerFunc(outletHandlers.RejectInvite)))
 
 	go refreshSvc.RunCleanupTicker(ctx, cfg.RefreshCleanupInterval)
 

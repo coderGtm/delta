@@ -4,6 +4,9 @@ SELECT * FROM users WHERE auth_uid = $1 AND deleted_at IS NULL LIMIT 1;
 -- name: GetUserByID :one
 SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1;
 
+-- name: GetUserByIDIncludingDeleted :one
+SELECT * FROM users WHERE id = $1 LIMIT 1;
+
 -- name: GetUserByEmailCaseInsensitive :one
 SELECT * FROM users WHERE lower(email) = lower($1) AND deleted_at IS NULL LIMIT 1;
 

@@ -217,9 +217,10 @@ func tenTo(n int32) *big.Int {
 	return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(n)), nil)
 }
 
-// getActiveMembership loads the current user's accepted membership in the
-// outlet. notFoundMsg identifies the membership subject in the NOT_FOUND
-// error.
+// getActiveMembership loads the caller's non-removed membership in the
+// outlet without checking its status. notFoundMsg identifies the membership
+// subject in the NOT_FOUND error. Callers that require an accepted status use
+// assertAcceptedMembership.
 func (s *Service) getActiveMembership(ctx context.Context, outletID, userID uuid.UUID, notFoundMsg string) (*db.OutletMembership, error) {
 	m, err := s.Store.Querier().GetMembershipByOutletAndUser(ctx, db.GetMembershipByOutletAndUserParams{
 		OutletID: pgUUID(outletID),
@@ -231,10 +232,21 @@ func (s *Service) getActiveMembership(ctx context.Context, outletID, userID uuid
 	if err != nil {
 		return nil, err
 	}
+	return &m, nil
+}
+
+// assertAcceptedMembership loads the caller's non-removed membership in the
+// outlet and rejects it with FORBIDDEN unless its status is ACCEPTED.
+// notFoundMsg identifies the membership subject in the NOT_FOUND error.
+func (s *Service) assertAcceptedMembership(ctx context.Context, outletID, userID uuid.UUID, notFoundMsg string) (*db.OutletMembership, error) {
+	m, err := s.getActiveMembership(ctx, outletID, userID, notFoundMsg)
+	if err != nil {
+		return nil, err
+	}
 	if m.Status != "ACCEPTED" {
 		return nil, httpapi.Forbidden("You must accept the outlet invitation before accessing this outlet")
 	}
-	return &m, nil
+	return m, nil
 }
 
 // assertActiveOutlet loads the non-removed outlet with the given ID. Only
@@ -361,7 +373,7 @@ func (s *Service) CreateOwn(ctx context.Context, userID, outletID uuid.UUID, req
 	if err := validateCreateOwn(req); err != nil {
 		return nil, err
 	}
-	m, err := s.getActiveMembership(ctx, outletID, userID, "Outlet membership was not found for the current user")
+	m, err := s.assertAcceptedMembership(ctx, outletID, userID, "Outlet membership was not found for the current user")
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +402,7 @@ func (s *Service) CreateOwn(ctx context.Context, userID, outletID uuid.UUID, req
 	s.Metrics.Increment("attendance.created", "mode", "self")
 	s.Audit.Record(ctx, userID.String(), "ATTENDANCE_CREATED", "ATTENDANCE_ENTRY", toUUID(entry.ID),
 		map[string]any{"outletId": outletID, "userId": userID, "type": entry.Type, "mode": "self"}, ip, userAgent)
-	u, err := s.Store.Querier().GetUserByID(ctx, pgUUID(userID))
+	u, err := s.Store.Querier().GetUserByIDIncludingDeleted(ctx, pgUUID(userID))
 	if err != nil {
 		return nil, err
 	}
@@ -403,7 +415,7 @@ func (s *Service) CreateManaged(ctx context.Context, ownerID, outletID uuid.UUID
 	if err := validateManage(req); err != nil {
 		return nil, err
 	}
-	m, err := s.getActiveMembership(ctx, outletID, ownerID, "Outlet membership was not found for the current user")
+	m, err := s.assertAcceptedMembership(ctx, outletID, ownerID, "Outlet membership was not found for the current user")
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +451,7 @@ func (s *Service) CreateManaged(ctx context.Context, ownerID, outletID uuid.UUID
 	s.Metrics.Increment("attendance.created", "mode", "managed")
 	s.Audit.Record(ctx, ownerID.String(), "ATTENDANCE_CREATED", "ATTENDANCE_ENTRY", toUUID(entry.ID),
 		map[string]any{"outletId": outletID, "userId": *req.UserID, "type": entry.Type, "mode": "managed"}, ip, userAgent)
-	u, err := s.Store.Querier().GetUserByID(ctx, pgUUID(*req.UserID))
+	u, err := s.Store.Querier().GetUserByIDIncludingDeleted(ctx, pgUUID(*req.UserID))
 	if err != nil {
 		return nil, err
 	}
@@ -449,7 +461,7 @@ func (s *Service) CreateManaged(ctx context.Context, ownerID, outletID uuid.UUID
 // Get returns a single attendance entry when the caller is allowed to view it.
 // Owners may view any entry; employees may only view their own.
 func (s *Service) Get(ctx context.Context, callerID, outletID, entryID uuid.UUID) (*EntryResponse, error) {
-	m, err := s.getActiveMembership(ctx, outletID, callerID, "Outlet membership was not found for the current user")
+	m, err := s.assertAcceptedMembership(ctx, outletID, callerID, "Outlet membership was not found for the current user")
 	if err != nil {
 		return nil, err
 	}
@@ -466,7 +478,7 @@ func (s *Service) Get(ctx context.Context, callerID, outletID, entryID uuid.UUID
 	if m.Role != "OWNER" && toUUID(e.UserID) != callerID {
 		return nil, httpapi.Forbidden("Employees can only view their own attendance entries")
 	}
-	u, err := s.Store.Querier().GetUserByID(ctx, pgUUID(toUUID(e.UserID)))
+	u, err := s.Store.Querier().GetUserByIDIncludingDeleted(ctx, pgUUID(toUUID(e.UserID)))
 	if err != nil {
 		return nil, err
 	}
@@ -483,7 +495,7 @@ func (s *Service) Update(ctx context.Context, ownerID, outletID, entryID uuid.UU
 	if err := validateUpdate(req); err != nil {
 		return nil, err
 	}
-	m, err := s.getActiveMembership(ctx, outletID, ownerID, "Outlet membership was not found for the current user")
+	m, err := s.assertAcceptedMembership(ctx, outletID, ownerID, "Outlet membership was not found for the current user")
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +532,7 @@ func (s *Service) Update(ctx context.Context, ownerID, outletID, entryID uuid.UU
 	s.Metrics.Increment("attendance.updated")
 	s.Audit.Record(ctx, ownerID.String(), "ATTENDANCE_UPDATED", "ATTENDANCE_ENTRY", entryID,
 		map[string]any{"outletId": outletID, "userId": toUUID(updated.UserID), "type": updated.Type}, ip, userAgent)
-	u, err := s.Store.Querier().GetUserByID(ctx, pgUUID(toUUID(updated.UserID)))
+	u, err := s.Store.Querier().GetUserByIDIncludingDeleted(ctx, pgUUID(toUUID(updated.UserID)))
 	if err != nil {
 		return nil, err
 	}
@@ -533,7 +545,7 @@ func (s *Service) Update(ctx context.Context, ownerID, outletID, entryID uuid.UU
 
 // Delete removes an attendance entry on behalf of an accepted outlet owner.
 func (s *Service) Delete(ctx context.Context, ownerID, outletID, entryID uuid.UUID, ip, userAgent string) error {
-	m, err := s.getActiveMembership(ctx, outletID, ownerID, "Outlet membership was not found for the current user")
+	m, err := s.assertAcceptedMembership(ctx, outletID, ownerID, "Outlet membership was not found for the current user")
 	if err != nil {
 		return err
 	}

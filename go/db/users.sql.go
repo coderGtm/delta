@@ -132,3 +132,24 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	)
 	return i, err
 }
+
+const GetUserByIDIncludingDeleted = `-- name: GetUserByIDIncludingDeleted :one
+SELECT id, auth_uid, name, email, phone, historical_email, deleted_at, created_at, updated_at FROM users WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserByIDIncludingDeleted(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, GetUserByIDIncludingDeleted, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.AuthUid,
+		&i.Name,
+		&i.Email,
+		&i.Phone,
+		&i.HistoricalEmail,
+		&i.DeletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

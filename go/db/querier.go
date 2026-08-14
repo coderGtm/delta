@@ -35,6 +35,7 @@ type Querier interface {
 	GetUserByAuthUID(ctx context.Context, authUid pgtype.Text) (User, error)
 	GetUserByEmailCaseInsensitive(ctx context.Context, lower string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
+	GetUserByIDIncludingDeleted(ctx context.Context, id pgtype.UUID) (User, error)
 	InsertAuditEvent(ctx context.Context, arg InsertAuditEventParams) (AuditEvent, error)
 	ListAttendanceByOutlet(ctx context.Context, arg ListAttendanceByOutletParams) ([]AttendanceEntry, error)
 	ListAttendanceByOutletAndUser(ctx context.Context, arg ListAttendanceByOutletAndUserParams) ([]AttendanceEntry, error)

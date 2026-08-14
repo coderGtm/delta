@@ -55,7 +55,7 @@ var attendanceSortable = map[string]string{
 // List returns the pages of attendance entries for an outlet. Owners may view
 // every entry or filter by user; employees may only view their own entries.
 func (s *Service) List(ctx context.Context, callerID, outletID uuid.UUID, targetUserID *uuid.UUID, p httpapi.PageParams) (*httpapi.PageResponse[EntryResponse], error) {
-	m, err := s.getActiveMembership(ctx, outletID, callerID, "Outlet membership was not found for the current user")
+	m, err := s.assertAcceptedMembership(ctx, outletID, callerID, "Outlet membership was not found for the current user")
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (s *Service) List(ctx context.Context, callerID, outletID uuid.UUID, target
 			CreatedAt: row.CreatedAt,
 			UpdatedAt: row.UpdatedAt,
 		}
-		u, err := s.Store.Querier().GetUserByID(ctx, pgUUID(toUUID(e.UserID)))
+		u, err := s.Store.Querier().GetUserByIDIncludingDeleted(ctx, pgUUID(toUUID(e.UserID)))
 		if err != nil {
 			return nil, err
 		}

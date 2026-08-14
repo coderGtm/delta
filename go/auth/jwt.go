@@ -1,5 +1,6 @@
-// Package auth implements authentication primitives, including the JWT
-// access-token signing and verification service.
+// Package auth implements authentication primitives: the JWT access-token
+// signing and verification service and the refresh-token lifecycle of
+// creation, validation, rotation, revocation, and cleanup.
 package auth
 
 import (

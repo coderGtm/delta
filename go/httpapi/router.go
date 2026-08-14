@@ -30,7 +30,7 @@ func NewRouter(logger *slog.Logger, trustProxyHeaders bool, prometheusToken stri
 			mux.Handle("GET /metrics", metricsHandler)
 		}
 	}
-	return Recoverer(SecurityHeaders(BodyLimit(2 << 20)(RequestLog(logger, trustProxyHeaders)(RequestID(mux)))))
+	return Recoverer(SecurityHeaders(BodyLimit(2 << 20)(RequestID(RequestLog(logger, trustProxyHeaders)(mux)))))
 }
 
 // prometheusAuth guards the metrics handler, requiring an Authorization header

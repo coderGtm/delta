@@ -16,6 +16,7 @@ import (
 	"github.com/coderGtm/delta/go/db"
 	"github.com/coderGtm/delta/go/httpapi"
 	"github.com/coderGtm/delta/go/metrics"
+	"github.com/coderGtm/delta/go/user"
 )
 
 func main() {
@@ -62,6 +63,9 @@ func main() {
 	apiMux.Handle("POST /api/v1/auth/refresh", http.HandlerFunc(authHandlers.Refresh))
 	apiMux.Handle("POST /api/v1/auth/logout", http.HandlerFunc(authHandlers.Logout))
 	apiMux.Handle("POST /api/v1/auth/logout-all", auth.Require(http.HandlerFunc(authHandlers.LogoutAll)))
+
+	userHandlers := user.NewHandler(authSvc, store, cfg.TrustProxyHeaders)
+	apiMux.Handle("DELETE /api/v1/users/me", auth.Require(http.HandlerFunc(userHandlers.DeleteMe)))
 
 	go refreshSvc.RunCleanupTicker(ctx, cfg.RefreshCleanupInterval)
 

@@ -32,9 +32,9 @@ type updateDisplayNameRequest struct {
 	DisplayName string `json:"displayName"`
 }
 
-// emailRe is a permissive email format check mirroring Hibernate's @Email
-// constraint (empty strings are rejected by the blank check before this runs;
-// single-label domains like a@b are accepted).
+// emailRe is a permissive email format check matching the reference
+// implementation's @Email constraint (empty strings are rejected by the blank
+// check before this runs; single-label domains like a@b are accepted).
 var emailRe = regexp.MustCompile(`^[^@\s]+@[^@\s]+$`)
 
 // currentUserID returns the authenticated user's ID from the request context.

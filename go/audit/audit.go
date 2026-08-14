@@ -54,8 +54,8 @@ func (r *Recorder) Record(ctx context.Context, actorUserID, action, entityType s
 			EntityType:   entityType,
 			EntityID:     pgtype.UUID{Bytes: entityID, Valid: true},
 			MetadataJson: metaJSON,
-			IpAddress:    pgtype.Text{String: ipStr, Valid: true},
-			UserAgent:    pgtype.Text{String: ua, Valid: true},
+			IpAddress:    pgtype.Text{String: ipStr, Valid: len(ipStr) > 0},
+			UserAgent:    pgtype.Text{String: ua, Valid: len(ua) > 0},
 		})
 		return err
 	}); err != nil {

@@ -52,14 +52,14 @@ type PageResponse[T any] struct {
 	Empty         bool  `json:"empty"`         // Whether the page has no items.
 }
 
-// WritePage writes a paginated response derived from the page content, the
-// total element count, and the request's page parameters.
-func WritePage[T any](w http.ResponseWriter, content []T, total int64, p PageParams) {
+// NewPageResponse builds a PageResponse from the page content, the total
+// element count, and the request's page parameters.
+func NewPageResponse[T any](content []T, total int64, p PageParams) *PageResponse[T] {
 	totalPages := 0
 	if total > 0 {
 		totalPages = int((total + int64(p.Size) - 1) / int64(p.Size))
 	}
-	WriteJSON(w, http.StatusOK, PageResponse[T]{
+	return &PageResponse[T]{
 		Content:       content,
 		Page:          p.Page,
 		Size:          p.Size,
@@ -68,5 +68,11 @@ func WritePage[T any](w http.ResponseWriter, content []T, total int64, p PagePar
 		First:         p.Page == 0,
 		Last:          int64(p.Page+1)*int64(p.Size) >= total,
 		Empty:         len(content) == 0,
-	})
+	}
+}
+
+// WritePage writes a paginated response derived from the page content, the
+// total element count, and the request's page parameters.
+func WritePage[T any](w http.ResponseWriter, content []T, total int64, p PageParams) {
+	WriteJSON(w, http.StatusOK, NewPageResponse(content, total, p))
 }

@@ -82,6 +82,20 @@ LIMIT $2 OFFSET $3;
 -- name: CountMembershipsForOutlet :one
 SELECT count(*) FROM outlet_memberships WHERE outlet_id = $1 AND removed_at IS NULL;
 
+-- name: GetMembershipDetailsByID :one
+SELECT m.id, m.outlet_id, m.user_id, m.role, m.status, m.display_name, m.invited_by_user_id, m.removed_at, m.removed_by_user_id, m.created_at, m.updated_at,
+       u.id AS user_id, u.name AS user_name, u.email AS user_email,
+       o.id AS outlet_id, o.name AS outlet_name, o.latitude, o.longitude, o.radius_meters,
+       o.geofence_enabled, o.removed_at AS outlet_removed_at, o.created_at AS outlet_created_at,
+       o.updated_at AS outlet_updated_at,
+       iu.id AS invited_by_user_id, iu.name AS invited_by_user_name
+FROM outlet_memberships m
+JOIN users u ON u.id = m.user_id
+JOIN outlets o ON o.id = m.outlet_id
+LEFT JOIN users iu ON iu.id = m.invited_by_user_id
+WHERE m.id = $1 AND m.removed_at IS NULL
+LIMIT 1;
+
 -- name: ListMembershipsForOutletByUser :many
 SELECT * FROM outlet_memberships
 WHERE outlet_id = $1 AND user_id = $2

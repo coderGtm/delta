@@ -227,6 +227,82 @@ func (q *Queries) GetMembershipByOutletAndUserIncludingRemoved(ctx context.Conte
 	return i, err
 }
 
+const GetMembershipDetailsByID = `-- name: GetMembershipDetailsByID :one
+SELECT m.id, m.outlet_id, m.user_id, m.role, m.status, m.display_name, m.invited_by_user_id, m.removed_at, m.removed_by_user_id, m.created_at, m.updated_at,
+       u.id AS user_id, u.name AS user_name, u.email AS user_email,
+       o.id AS outlet_id, o.name AS outlet_name, o.latitude, o.longitude, o.radius_meters,
+       o.geofence_enabled, o.removed_at AS outlet_removed_at, o.created_at AS outlet_created_at,
+       o.updated_at AS outlet_updated_at,
+       iu.id AS invited_by_user_id, iu.name AS invited_by_user_name
+FROM outlet_memberships m
+JOIN users u ON u.id = m.user_id
+JOIN outlets o ON o.id = m.outlet_id
+LEFT JOIN users iu ON iu.id = m.invited_by_user_id
+WHERE m.id = $1 AND m.removed_at IS NULL
+LIMIT 1
+`
+
+type GetMembershipDetailsByIDRow struct {
+	ID                pgtype.UUID
+	OutletID          pgtype.UUID
+	UserID            pgtype.UUID
+	Role              string
+	Status            string
+	DisplayName       string
+	InvitedByUserID   pgtype.UUID
+	RemovedAt         pgtype.Timestamptz
+	RemovedByUserID   pgtype.UUID
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+	UserID_2          pgtype.UUID
+	UserName          string
+	UserEmail         pgtype.Text
+	OutletID_2        pgtype.UUID
+	OutletName        string
+	Latitude          pgtype.Numeric
+	Longitude         pgtype.Numeric
+	RadiusMeters      int32
+	GeofenceEnabled   bool
+	OutletRemovedAt   pgtype.Timestamptz
+	OutletCreatedAt   pgtype.Timestamptz
+	OutletUpdatedAt   pgtype.Timestamptz
+	InvitedByUserID_2 pgtype.UUID
+	InvitedByUserName pgtype.Text
+}
+
+func (q *Queries) GetMembershipDetailsByID(ctx context.Context, id pgtype.UUID) (GetMembershipDetailsByIDRow, error) {
+	row := q.db.QueryRow(ctx, GetMembershipDetailsByID, id)
+	var i GetMembershipDetailsByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.OutletID,
+		&i.UserID,
+		&i.Role,
+		&i.Status,
+		&i.DisplayName,
+		&i.InvitedByUserID,
+		&i.RemovedAt,
+		&i.RemovedByUserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.UserID_2,
+		&i.UserName,
+		&i.UserEmail,
+		&i.OutletID_2,
+		&i.OutletName,
+		&i.Latitude,
+		&i.Longitude,
+		&i.RadiusMeters,
+		&i.GeofenceEnabled,
+		&i.OutletRemovedAt,
+		&i.OutletCreatedAt,
+		&i.OutletUpdatedAt,
+		&i.InvitedByUserID_2,
+		&i.InvitedByUserName,
+	)
+	return i, err
+}
+
 const GetOutletByID = `-- name: GetOutletByID :one
 SELECT id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at FROM outlets WHERE id = $1 AND removed_at IS NULL LIMIT 1
 `

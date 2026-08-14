@@ -214,6 +214,9 @@ func (s *Service) InviteMember(ctx context.Context, ownerID, outletID uuid.UUID,
 			InvitedByUserID: pgUUID(toUUID(inviter.ID)),
 		})
 	} else {
+		if _, err := s.getActiveOutlet(ctx, outletID); err != nil {
+			return nil, err
+		}
 		m, err = s.Store.Querier().CreateMembership(ctx, db.CreateMembershipParams{
 			OutletID:        pgUUID(outletID),
 			UserID:          pgUUID(toUUID(invitee.ID)),

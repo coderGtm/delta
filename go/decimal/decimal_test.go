@@ -50,6 +50,36 @@ func TestParseRejectsInvalid(t *testing.T) {
 	}
 }
 
+func TestParseExponentBounds(t *testing.T) {
+	tenPow100 := new(big.Int).Exp(big.NewInt(10), big.NewInt(100), nil)
+	valid := []struct {
+		in    string
+		coeff *big.Int
+		scale int32
+	}{
+		{"1e100", tenPow100, 0},
+		{"-1e100", new(big.Int).Neg(tenPow100), 0},
+		{"1e-100", big.NewInt(1), 100},
+		{"1e0", big.NewInt(1), 0},
+	}
+	for _, tc := range valid {
+		d, err := Parse([]byte(tc.in))
+		if err != nil {
+			t.Errorf("Parse(%q) unexpected error: %v", tc.in, err)
+			continue
+		}
+		if d.coeff.Cmp(tc.coeff) != 0 || d.scale != tc.scale {
+			t.Errorf("Parse(%q) = coeff %s scale %d, want coeff %s scale %d", tc.in, d.coeff, d.scale, tc.coeff, tc.scale)
+		}
+	}
+
+	for _, in := range []string{"1e4294967297", "1e-3000000000", "1e99999999999999999999", "1e101", "1e-101"} {
+		if _, err := Parse([]byte(in)); err == nil {
+			t.Errorf("Parse(%q) succeeded, want error", in)
+		}
+	}
+}
+
 func TestScaleToRoundHalfAway(t *testing.T) {
 	cases := []struct {
 		in    string

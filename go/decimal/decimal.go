@@ -17,9 +17,18 @@ type Decimal struct {
 	scale int32
 }
 
+// maxExponent bounds the magnitude of a literal exponent so that parsing a
+// hostile exponent cannot force an unbounded big.Int allocation (scaling a
+// coefficient by 10^n for a huge n would otherwise consume unbounded memory).
+// 100 keeps every parsed coefficient within a few hundred digits while
+// covering every magnitude this package is used for (latitudes, longitudes,
+// and radii).
+const maxExponent = 100
+
 // Parse parses b as a decimal number literal and returns its exact value. The
 // literal may carry an optional minus sign, integer and fraction digits, and
-// an optional e or E exponent. Empty and malformed input is rejected.
+// an optional e or E exponent. Empty and malformed input is rejected, as is
+// any exponent whose magnitude exceeds maxExponent.
 func Parse(b []byte) (*Decimal, error) {
 	s := string(b)
 	if s == "" {
@@ -66,12 +75,15 @@ func Parse(b []byte) (*Decimal, error) {
 		if i == es {
 			return nil, fmt.Errorf("decimal: invalid number %q", s)
 		}
-		n, err := strconv.Atoi(s[es:i])
+		n, err := strconv.ParseInt(s[es:i], 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("decimal: invalid number %q", s)
 		}
 		if expNeg {
 			n = -n
+		}
+		if n > maxExponent || n < -maxExponent {
+			return nil, fmt.Errorf("decimal: exponent out of range %q", s)
 		}
 		exp = int32(n)
 	}
@@ -159,12 +171,6 @@ func (d *Decimal) UnmarshalJSON(b []byte) error {
 	}
 	*d = *v
 	return nil
-}
-
-// unscaledAt returns a fresh big.Int holding the coefficient scaled to scale
-// fractional digits, rounding half away from zero when needed.
-func (d Decimal) unscaledAt(scale int32) *big.Int {
-	return scaledCoeff(d.coefficient(), d.scale, scale)
 }
 
 // coefficient returns the coefficient, substituting zero when d is the zero

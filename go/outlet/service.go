@@ -6,10 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/coderGtm/delta/go/audit"
 	"github.com/coderGtm/delta/go/db"
@@ -70,7 +72,7 @@ func validateOutlet(name string, lat, lon *decimal.Decimal, radius *int) *httpap
 	var msgs []string
 	if strings.TrimSpace(name) == "" {
 		msgs = append(msgs, "Outlet name is required")
-	} else if len(name) > 150 {
+	} else if utf8.RuneCountInString(name) > 150 {
 		msgs = append(msgs, "Outlet name must be at most 150 characters")
 	}
 	if lat == nil {
@@ -97,6 +99,8 @@ func validateOutlet(name string, lat, lon *decimal.Decimal, radius *int) *httpap
 		msgs = append(msgs, "Radius in meters is required")
 	} else if *radius <= 0 {
 		msgs = append(msgs, "Radius in meters must be greater than zero")
+	} else if *radius > math.MaxInt32 {
+		msgs = append(msgs, "Radius in meters must be less than or equal to 2147483647")
 	}
 	if len(msgs) == 0 {
 		return nil
@@ -106,9 +110,9 @@ func validateOutlet(name string, lat, lon *decimal.Decimal, radius *int) *httpap
 
 // pgNumericFromDecimal converts d to a scale-7 PostgreSQL numeric value,
 // rounding half away from zero when needed.
-func pgNumericFromDecimal(d decimal.Decimal) (pgtype.Numeric, error) {
+func pgNumericFromDecimal(d decimal.Decimal) pgtype.Numeric {
 	d.ScaleTo(7)
-	return pgtype.Numeric{Int: d.Unscaled(), Exp: -7, Valid: true}, nil
+	return pgtype.Numeric{Int: d.Unscaled(), Exp: -7, Valid: true}
 }
 
 // decimalFromPgNumeric converts a PostgreSQL numeric value into a scale-7
@@ -224,14 +228,8 @@ func (s *Service) CreateOutlet(ctx context.Context, userID uuid.UUID, req Create
 	if err != nil {
 		return nil, err
 	}
-	lat, err := pgNumericFromDecimal(*req.Latitude)
-	if err != nil {
-		return nil, err
-	}
-	lon, err := pgNumericFromDecimal(*req.Longitude)
-	if err != nil {
-		return nil, err
-	}
+	lat := pgNumericFromDecimal(*req.Latitude)
+	lon := pgNumericFromDecimal(*req.Longitude)
 	var out db.Outlet
 	err = s.Store.Tx(ctx, func(q db.Querier) error {
 		o, err := q.CreateOutlet(ctx, db.CreateOutletParams{
@@ -285,14 +283,8 @@ func (s *Service) UpdateOutlet(ctx context.Context, userID, outletID uuid.UUID, 
 	if _, err := s.getActiveOutlet(ctx, outletID); err != nil {
 		return nil, err
 	}
-	lat, err := pgNumericFromDecimal(*req.Latitude)
-	if err != nil {
-		return nil, err
-	}
-	lon, err := pgNumericFromDecimal(*req.Longitude)
-	if err != nil {
-		return nil, err
-	}
+	lat := pgNumericFromDecimal(*req.Latitude)
+	lon := pgNumericFromDecimal(*req.Longitude)
 	updated, err := s.Store.Querier().UpdateOutlet(ctx, db.UpdateOutletParams{
 		ID:           pgUUID(outletID),
 		Name:         strings.TrimSpace(req.Name),
@@ -312,6 +304,9 @@ func (s *Service) UpdateOutlet(ctx context.Context, userID, outletID uuid.UUID, 
 // accepted outlet owners may perform this action.
 func (s *Service) UpdateGeofence(ctx context.Context, userID, outletID uuid.UUID, enabled bool, ip, userAgent string) (*OutletResponse, error) {
 	if _, err := s.assertOwner(ctx, outletID, userID); err != nil {
+		return nil, err
+	}
+	if _, err := s.getActiveOutlet(ctx, outletID); err != nil {
 		return nil, err
 	}
 	updated, err := s.Store.Querier().UpdateOutletGeofence(ctx, db.UpdateOutletGeofenceParams{

@@ -1,6 +1,7 @@
 package outlet
 
 import (
+	"math"
 	"math/big"
 	"strings"
 	"testing"
@@ -46,6 +47,26 @@ func TestValidateOutlet(t *testing.T) {
 	if ae.Code != "VALIDATION_ERROR" || ae.Message != "Outlet name must be at most 150 characters" {
 		t.Errorf("got %q %q, want VALIDATION_ERROR %q", ae.Code, ae.Message, "Outlet name must be at most 150 characters")
 	}
+
+	if err := validateOutlet(strings.Repeat("خ", 150), dec(t, "10"), dec(t, "20"), intPtr(5)); err != nil {
+		t.Errorf("150-rune (300-byte) name rejected: %v", err)
+	}
+
+	err = validateOutlet(strings.Repeat("خ", 151), dec(t, "10"), dec(t, "20"), intPtr(5))
+	ae = err
+	if ae.Code != "VALIDATION_ERROR" || ae.Message != "Outlet name must be at most 150 characters" {
+		t.Errorf("got %q %q, want VALIDATION_ERROR %q", ae.Code, ae.Message, "Outlet name must be at most 150 characters")
+	}
+
+	if err := validateOutlet("HQ", dec(t, "10"), dec(t, "20"), intPtr(math.MaxInt32)); err != nil {
+		t.Errorf("radius = MaxInt32 rejected: %v", err)
+	}
+
+	err = validateOutlet("HQ", dec(t, "10"), dec(t, "20"), intPtr(math.MaxInt32+1))
+	ae = err
+	if ae.Code != "VALIDATION_ERROR" || ae.Message != "Radius in meters must be less than or equal to 2147483647" {
+		t.Errorf("got %q %q, want VALIDATION_ERROR %q", ae.Code, ae.Message, "Radius in meters must be less than or equal to 2147483647")
+	}
 }
 
 func TestAssertOwnerRole(t *testing.T) {
@@ -60,10 +81,7 @@ func TestAssertOwnerRole(t *testing.T) {
 }
 
 func TestPgNumericFromDecimal(t *testing.T) {
-	n, err := pgNumericFromDecimal(*dec(t, "40.7128"))
-	if err != nil {
-		t.Fatalf("pgNumericFromDecimal: %v", err)
-	}
+	n := pgNumericFromDecimal(*dec(t, "40.7128"))
 	if !n.Valid || n.Exp != -7 {
 		t.Errorf("numeric = %+v, want Valid with Exp -7", n)
 	}

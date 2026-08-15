@@ -27,28 +27,28 @@ Current API version prefix:
 
 ## API documentation
 
-- The OpenAPI spec is hand-maintained at `go/httpapi/openapi.yaml` and served at `/docs` (embedded Swagger UI) and `/docs/openapi.yaml`.
+- The OpenAPI spec is hand-maintained at `httpapi/openapi.yaml` and served at `/docs` (embedded Swagger UI) and `/docs/openapi.yaml`.
 - Changes to handlers and DTOs must be reflected in the spec manually.
-- Contract tests in `go/contract` assert the runtime matches the spec.
+- Contract tests in `contract` assert the runtime matches the spec.
 
 ## Important commands
 
 Run tests:
 
 ```bash
-cd go && make test
+make test
 ```
 
 Build binary:
 
 ```bash
-cd go && make build
+make build
 ```
 
 Lint:
 
 ```bash
-cd go && make lint
+make lint
 ```
 
 Validate Docker Compose:
@@ -66,10 +66,10 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Regenerate sqlc code after editing `go/db/queries/*.sql`:
+Regenerate sqlc code after editing `db/queries/*.sql`:
 
 ```bash
-cd go/db && sqlc generate
+cd db && sqlc generate
 ```
 
 ## Architectural rules
@@ -78,7 +78,7 @@ cd go/db && sqlc generate
 - Put business logic in services.
 - Use DTOs for request/response payloads.
 - Do not expose `db` models directly from handlers; map to response DTOs.
-- Keep persistence/query concerns in `go/db`; services use `db.Store` / `db.Querier`.
+- Keep persistence/query concerns in `db`; services use `db.Store` / `db.Querier`.
 - Use flat packages with one clear purpose and no import cycles; domain packages must not import each other sideways — `cmd/delta/main.go` is the wiring point.
 - Keep changes minimal and consistent with existing style.
 - Document every exported identifier with a doc comment; comment non-obvious behavior.
@@ -90,7 +90,7 @@ cd go/db && sqlc generate
 - Database schema is managed by golang-migrate migrations in:
 
 ```text
-go/db/migrations
+db/migrations
 ```
 
 - Do not rely on any ORM to create/update production schema.
@@ -170,8 +170,8 @@ Collection endpoints should use DB-level pagination with `httpapi.PageParams` an
 Shared helpers:
 
 ```text
-httpapi.ParsePageParams / PageParams (go/httpapi/pagination.go)
-httpapi.NewPageResponse / WritePage (go/httpapi/response.go)
+httpapi.ParsePageParams / PageParams (httpapi/pagination.go)
+httpapi.NewPageResponse / WritePage (httpapi/response.go)
 ```
 
 ## Cross-cutting concerns
@@ -181,7 +181,7 @@ httpapi.NewPageResponse / WritePage (go/httpapi/response.go)
 Use `audit.Recorder` for business events worth investigating later:
 
 ```text
-go/audit
+audit
 ```
 
 Examples:
@@ -198,7 +198,7 @@ Examples:
 Use `metrics.Registry` for business counters:
 
 ```text
-go/metrics
+metrics
 ```
 
 Metrics are exposed via Prometheus format at:
@@ -237,7 +237,7 @@ For behavior changes:
 
 ## Docker/deployment notes
 
-- Docker build uses the Go toolchain via `go/Dockerfile` (multi-stage: `golang:1.25-alpine` builder, non-root `alpine` runtime).
+- Docker build uses the Go toolchain via `Dockerfile` (multi-stage: `golang:1.25-alpine` builder, non-root `alpine` runtime).
 - The builder stage runs `go mod download` before copying sources; the module cache is not persisted between builds.
 - Runtime image runs as non-root user.
 - Local secrets should be in `.env` and `firebase/service-account.json`; both are ignored by Git.

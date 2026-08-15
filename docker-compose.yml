@@ -18,7 +18,7 @@ services:
 
   app:
     build:
-      context: ./go
+      context: .
     container_name: delta-app
     depends_on:
       postgres:

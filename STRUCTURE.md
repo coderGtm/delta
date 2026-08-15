@@ -1,17 +1,15 @@
 # Project Structure
 
-The backend lives in `go/` as a single Go module:
+The backend is a single Go module at the repository root:
 
 ```text
-github.com/coderGtm/delta/go
+github.com/coderGtm/delta
 ```
-
-The Java sources under `src/` remain in the repository as a read-only contract reference during the migration and are not part of the Go build.
 
 ## Application entrypoint
 
 ```text
-go/cmd/delta/main.go
+cmd/delta/main.go
 ```
 
 Pure wiring: loads config, opens the pgx pool, applies embedded migrations, constructs services, registers the `/api/v1` routes, and starts the HTTP server with graceful shutdown. No business logic.
@@ -21,7 +19,7 @@ Pure wiring: loads config, opens the pgx pool, applies embedded migrations, cons
 ### `config`
 
 ```text
-go/config/config.go
+config/config.go
 ```
 
 Loads the service configuration from environment variables into a single `Config` struct (see `SETUP.md` for the env table).
@@ -29,7 +27,7 @@ Loads the service configuration from environment variables into a single `Config
 ### `httpapi`
 
 ```text
-go/httpapi
+httpapi
  ├── router.go       # ops endpoints (/docs, /healthz, /readyz, /metrics) + middleware chain
  ├── middleware.go   # RequestID, RequestLog, Recoverer, SecurityHeaders, BodyLimit
  ├── ratelimit.go    # in-memory fixed-window rate limiter (single instance)
@@ -47,7 +45,7 @@ Shared HTTP plumbing used by all domain handlers.
 ### `db`
 
 ```text
-go/db
+db
  ├── connect.go     # pgx connection pool
  ├── migrations.go  # golang-migrate runner over embedded migrations
  ├── store.go       # Store: pool wrapper, Querier access, and Tx
@@ -65,7 +63,7 @@ Persistence concerns only; services depend on `db.Store` / `db.Querier`.
 ### `auth`
 
 ```text
-go/auth
+auth
  ├── firebase.go     # Firebase ID-token verify/delete (+ stub when unconfigured)
  ├── jwt.go          # HS256 access-token sign/parse
  ├── refreshtoken.go # refresh-token lifecycle: create/validate/rotate/revoke/cleanup
@@ -79,7 +77,7 @@ Authentication and token lifecycle.
 ### `user`
 
 ```text
-go/user
+user
  ├── service.go  # account-deletion boundary
  └── handlers.go # DELETE /users/me
 ```
@@ -89,7 +87,7 @@ Signed-in user's own account endpoints.
 ### `outlet`
 
 ```text
-go/outlet
+outlet
  ├── service.go     # outlet CRUD + membership domain logic
  ├── handlers.go    # outlet/membership HTTP handlers
  ├── listings.go    # paginated /mine, /invites, /memberships listings
@@ -101,7 +99,7 @@ Outlet management, owner/employee memberships, invitations, membership soft-remo
 ### `attendance`
 
 ```text
-go/attendance
+attendance
  ├── service.go  # attendance entry domain logic
  ├── geofence.go # haversine geofence enforcement
  ├── handlers.go # attendance HTTP handlers
@@ -113,7 +111,7 @@ Attendance entry CRUD and geofence enforcement.
 ### `report`
 
 ```text
-go/report
+report
  ├── service.go  # salary report calculation (pairing, hours, daily grouping)
  ├── excel.go    # .xlsx export with formula-injection sanitization
  └── handlers.go # salary report HTTP handlers
@@ -126,7 +124,7 @@ Owner-facing salary reports (JSON + Excel).
 ### `audit`
 
 ```text
-go/audit/audit.go
+audit/audit.go
 ```
 
 `audit.Recorder` writes business audit events best-effort in their own transaction, so a failure never rolls back the business write.
@@ -134,7 +132,7 @@ go/audit/audit.go
 ### `metrics`
 
 ```text
-go/metrics/metrics.go
+metrics/metrics.go
 ```
 
 `metrics.Registry` holds lazy Prometheus business counters and exposes them via the `/metrics` handler.
@@ -142,7 +140,7 @@ go/metrics/metrics.go
 ### `decimal`
 
 ```text
-go/decimal/decimal.go
+decimal/decimal.go
 ```
 
 Exact decimal arithmetic on arbitrary-precision integers, used for latitudes, longitudes, radii, and salary math.
@@ -150,7 +148,7 @@ Exact decimal arithmetic on arbitrary-precision integers, used for latitudes, lo
 ### `contract`
 
 ```text
-go/contract
+contract
  ├── contract_test.go # contract tests asserting the runtime matches openapi.yaml
  ├── testdb.go        # testcontainers PostgreSQL setup
  └── stub.go          # Firebase stub for tests
@@ -161,33 +159,31 @@ Test-only package: shared testcontainers infrastructure and the contract-test su
 ## Resources
 
 ```text
-go/
- ├── Dockerfile   # multi-stage: golang:1.25-alpine build, non-root alpine runtime
- ├── Makefile     # build / test / lint / vet / fmt / run
- ├── go.mod
- ├── go.sum
- └── README.md
+Dockerfile   # multi-stage: golang:1.25-alpine build, non-root alpine runtime
+Makefile     # build / test / lint / vet / fmt / run
+go.mod
+go.sum
+README.md
 ```
 
 ## Root-level files
 
 ```text
-docker-compose.yml                       # builds go/, healthchecks on /readyz
+docker-compose.yml                       # builds the Go image, healthchecks on /readyz
 .env.example                             # local secrets and Go service env vars
 firebase/service-account.json            # local secret, ignored by Git
 loadtest/                                # k6 scripts (mint local JWTs; unchanged)
 monitoring/
  ├── prometheus/prometheus.yml           # scrapes /metrics with bearer token
  └── grafana/                            # provisioned Delta Overview dashboard
-src/                                     # Java reference implementation (read-only)
 ```
 
 ## Note on sqlc
 
-Queries are hand-written in `go/db/queries/*.sql`. After editing them, regenerate the Go code:
+Queries are hand-written in `db/queries/*.sql`. After editing them, regenerate the Go code:
 
 ```bash
-cd go/db && sqlc generate
+cd db && sqlc generate
 ```
 
 The generated files (`models.go`, `db.go`, `querier.go`, `*.sql.go`) are committed to the repository and must not be hand-edited.

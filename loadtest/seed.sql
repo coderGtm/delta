@@ -14,12 +14,12 @@ insert into outlets (id, name, latitude, longitude, radius_meters, geofence_enab
     ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Load Test Outlet', 12.9715987, 77.5945627, 500, false, now(), now())
 on conflict (id) do nothing;
 
-insert into outlet_memberships (id, outlet_id, user_id, role, status, invited_by_user_id, removed_at, removed_by_user_id, created_at, updated_at) values
-    ('c1111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'OWNER',    'ACCEPTED', null, null, null, now(), now()),
-    ('c2222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'EMPLOYEE', 'ACCEPTED', null, null, null, now(), now()),
-    ('c3333333-3333-3333-3333-333333333333', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333', 'EMPLOYEE', 'ACCEPTED', null, null, null, now(), now()),
-    ('c4444444-4444-4444-4444-444444444444', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '44444444-4444-4444-4444-444444444444', 'EMPLOYEE', 'ACCEPTED', null, null, null, now(), now()),
-    ('c5555555-5555-5555-5555-555555555555', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '55555555-5555-5555-5555-555555555555', 'EMPLOYEE', 'ACCEPTED', null, null, null, now(), now())
+insert into outlet_memberships (id, outlet_id, user_id, role, status, display_name, invited_by_user_id, removed_at, removed_by_user_id, created_at, updated_at) values
+    ('c1111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'OWNER',    'ACCEPTED', 'Load Owner',    null, null, null, now(), now()),
+    ('c2222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'EMPLOYEE', 'ACCEPTED', 'Load Employee 1', null, null, null, now(), now()),
+    ('c3333333-3333-3333-3333-333333333333', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333', 'EMPLOYEE', 'ACCEPTED', 'Load Employee 2', null, null, null, now(), now()),
+    ('c4444444-4444-4444-4444-444444444444', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '44444444-4444-4444-4444-444444444444', 'EMPLOYEE', 'ACCEPTED', 'Load Employee 3', null, null, null, now(), now()),
+    ('c5555555-5555-5555-5555-555555555555', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '55555555-5555-5555-5555-555555555555', 'EMPLOYEE', 'ACCEPTED', 'Load Employee 4', null, null, null, now(), now())
 on conflict (outlet_id, user_id) do nothing;
 
 -- A few weeks of paired clock-in/clock-out entries per employee so list

@@ -53,7 +53,7 @@ type SalaryReport struct {
 }
 
 // hoursBetween returns the scale-2 hours between clockIn and clockOut,
-// rounding half up. Whole seconds only, like the reference implementation.
+// rounding half up. Whole seconds only, matching the contract.
 func hoursBetween(clockIn, clockOut time.Time) (decimal.Decimal, error) {
 	seconds := new(big.Int).SetInt64(int64(clockOut.Sub(clockIn) / time.Second))
 	n := new(big.Int).Mul(seconds, big.NewInt(100))
@@ -289,8 +289,8 @@ func (s *Service) Calculate(ctx context.Context, ownerID, outletID, employeeID u
 	s.Audit.Record(ctx, ownerID.String(), "SALARY_REPORT_GENERATED", "OUTLET", outletID,
 		map[string]any{
 			"employeeUserId": employeeID,
-			"startTime":      start.String(),
-			"endTime":        end.String(),
+			"startTime":      start.UTC().Format(time.RFC3339Nano),
+			"endTime":        end.UTC().Format(time.RFC3339Nano),
 			"timezone":       loc.String(),
 			"format":         "json",
 		}, ip, userAgent)

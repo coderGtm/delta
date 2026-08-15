@@ -111,6 +111,11 @@ func main() {
 	rateLimiter := httpapi.NewRateLimiter(cfg.TrustProxyHeaders)
 
 	handler := httpapi.NewRouter(logger, cfg, ready, registry.Handler(), auth.AttachUser(jwtSvc, store), rateLimiter.Middleware, apiMux)
+	handler = registry.HTTPMiddleware(handler)
+	registry.RegisterPoolStats(func() (float64, float64) {
+		s := pool.Stat()
+		return float64(s.TotalConns()), float64(s.IdleConns())
+	})
 
 	srv := &http.Server{
 		Addr:              ":" + strconv.Itoa(cfg.Port),

@@ -85,6 +85,8 @@ func (r *RateLimiter) Middleware(next http.Handler) http.Handler {
 		counterKey := p.method + ":" + p.path + ":" + key
 
 		now := time.Now()
+		var over bool
+		var retry int
 		r.mu.Lock()
 		wnd := r.windows[counterKey]
 		if wnd == nil || now.After(wnd.endsAt) {
@@ -93,13 +95,14 @@ func (r *RateLimiter) Middleware(next http.Handler) http.Handler {
 		} else {
 			wnd.count++
 		}
+		over = wnd.count > p.limit
+		retry = int(time.Until(wnd.endsAt) / time.Second)
+		if retry < 1 {
+			retry = 1
+		}
 		r.mu.Unlock()
 
-		if wnd.count > p.limit {
-			retry := int(time.Until(wnd.endsAt) / time.Second)
-			if retry < 1 {
-				retry = 1
-			}
+		if over {
 			w.Header().Set("Retry-After", strconv.Itoa(retry))
 			WriteError(w, RateLimitExceeded("Too many requests. Please retry later."))
 			return

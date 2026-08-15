@@ -86,7 +86,7 @@ func TestRateLimitRetryAfter(t *testing.T) {
 }
 
 func TestRateLimitWindowReset(t *testing.T) {
-	rl := newRateLimiter(false, []policy{{"POST", "/api/v1/auth/login", 10, 50 * time.Millisecond, false}})
+	rl := newRateLimiter(false, []policy{{"POST", "/api/v1/auth/login", 10, 30 * time.Millisecond, false}})
 	h := rl.Middleware(noContent())
 	serve := func() int {
 		req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
@@ -103,7 +103,7 @@ func TestRateLimitWindowReset(t *testing.T) {
 	if code := serve(); code != http.StatusTooManyRequests {
 		t.Fatalf("request 11 status = %d, want 429", code)
 	}
-	time.Sleep(60 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	if code := serve(); code != http.StatusNoContent {
 		t.Fatalf("after window reset status = %d, want 204", code)
 	}
@@ -177,6 +177,8 @@ func TestMatchPath(t *testing.T) {
 		{"/api/v1/outlets/*/attendance/*", "/api/v1/outlets/abc/attendance/entry-1", true},
 		{"/api/v1/outlets/*/attendance/*", "/api/v1/outlets/abc/attendance", false},
 		{"/api/v1/outlets/*/attendance/*", "/api/v1/outlets/abc/attendance/entry-1/extra", false},
+		{"/api/v1/outlets/*/attendance", "/api/v1/outlets/abc/attendance", true},
+		{"/api/v1/outlets/*/attendance", "/api/v1/outlets/abc/attendance/manage", false},
 	}
 	for _, c := range cases {
 		if got := matchPath(c.pattern, c.path); got != c.want {

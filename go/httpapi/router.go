@@ -16,9 +16,11 @@ import (
 // /metrics, gated by a bearer token when cfg.PrometheusBearerToken is
 // non-empty. attach applies domain-specific authentication middleware between
 // the request log and the mux, so authenticated subjects are resolved before
-// any request-completion logging line runs. rate applies rate limiting after
-// authentication, keying counters by the authenticated subject where the
-// policy requires it, while still allowing rate-limited requests to be logged.
+// any request-completion logging line runs. rate sits inside attach, applying
+// rate limiting after authentication so counters are keyed by the
+// authenticated subject where the policy requires it; rate-limited requests
+// still flow out through attach and RequestLog, so they are logged with their
+// userId and request id.
 func NewRouter(logger *slog.Logger, cfg config.Config, ready func(ctx context.Context) error, metricsHandler http.Handler, attach func(http.Handler) http.Handler, rate func(http.Handler) http.Handler, mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusOK, map[string]string{"status": "UP"})
@@ -37,7 +39,7 @@ func NewRouter(logger *slog.Logger, cfg config.Config, ready func(ctx context.Co
 			mux.Handle("GET /metrics", metricsHandler)
 		}
 	}
-	return Recoverer(SecurityHeaders(BodyLimit(2 << 20)(RequestID(RequestLog(logger, cfg.TrustProxyHeaders)(rate(attach(mux)))))))
+	return Recoverer(SecurityHeaders(BodyLimit(2 << 20)(RequestID(RequestLog(logger, cfg.TrustProxyHeaders)(attach(rate(mux)))))))
 }
 
 // prometheusAuth guards the metrics handler, requiring an Authorization header

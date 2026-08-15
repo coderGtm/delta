@@ -98,6 +98,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/auth/refresh:
     post:
       tags: [Auth]
@@ -125,6 +127,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/auth/logout:
     post:
       tags: [Auth]
@@ -146,6 +150,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/auth/logout-all:
     post:
       tags: [Auth]
@@ -155,9 +161,11 @@ paths:
         '204':
           description: All tokens revoked.
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/users/me:
     delete:
       tags: [Users]
@@ -170,9 +178,11 @@ paths:
         '204':
           description: Account deleted.
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '409':
           $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets:
     post:
       tags: [Outlets]
@@ -196,9 +206,11 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}:
     get:
       tags: [Outlets]
@@ -214,11 +226,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/OutletResponse'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Outlets]
       summary: Update an outlet
@@ -241,11 +255,13 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [Outlets]
       summary: Delete an outlet
@@ -256,11 +272,13 @@ paths:
         '204':
           description: Outlet deleted.
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/geofence:
     put:
       tags: [Outlets]
@@ -284,13 +302,15 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/mine:
     get:
       tags: [Outlets]
@@ -306,9 +326,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PageResponse'
+                $ref: '#/components/schemas/PageResponseMembership'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/invites:
     get:
       tags: [Outlets]
@@ -324,9 +346,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PageResponse'
+                $ref: '#/components/schemas/PageResponseMembership'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/memberships:
     get:
       tags: [Outlets]
@@ -343,13 +367,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PageResponse'
+                $ref: '#/components/schemas/PageResponseMembership'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/leave:
     post:
       tags: [Outlets]
@@ -365,9 +391,11 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/memberships/invite:
     post:
       tags: [Outlets]
@@ -391,7 +419,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -400,6 +428,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/memberships/{membershipId}:
     delete:
       tags: [Outlets]
@@ -414,11 +444,13 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/memberships/{membershipId}/display-name:
     put:
       tags: [Outlets]
@@ -443,11 +475,13 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/memberships/{membershipId}/accept:
     post:
       tags: [Outlets]
@@ -465,11 +499,13 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/memberships/{membershipId}/reject:
     post:
       tags: [Outlets]
@@ -487,11 +523,13 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/attendance:
     post:
       tags: [Attendance]
@@ -518,13 +556,15 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     get:
       tags: [Attendance]
       summary: List attendance entries
@@ -543,15 +583,17 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PageResponse'
+                $ref: '#/components/schemas/PageResponseAttendance'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/attendance/manage:
     post:
       tags: [Attendance]
@@ -578,13 +620,15 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/attendance/{attendanceEntryId}:
     get:
       tags: [Attendance]
@@ -603,11 +647,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/AttendanceEntryResponse'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags: [Attendance]
       summary: Update an attendance entry
@@ -631,13 +677,15 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [Attendance]
       summary: Delete an attendance entry
@@ -649,11 +697,13 @@ paths:
         '204':
           description: Attendance entry deleted.
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/reports/salary:
     get:
       tags: [Reports]
@@ -678,13 +728,15 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/{outletId}/reports/salary.xlsx:
     get:
       tags: [Reports]
@@ -715,13 +767,15 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/UnauthorizedChallenge'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 components:
   securitySchemes:
     bearerAuth:
@@ -844,7 +898,27 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     Unauthorized:
-      description: The request lacks a valid access token or the supplied credential is invalid.
+      description: |
+        The supplied credential is invalid, for example a malformed or expired
+        Firebase ID token or refresh token. Public auth endpoints return this
+        JSON envelope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnauthorizedChallenge:
+      description: |
+        The request carries no valid bearer access token. The response body is
+        empty; the WWW-Authenticate header indicates the required scheme.
+      headers:
+        WWW-Authenticate:
+          description: Challenge indicating the bearer authentication scheme.
+          schema:
+            type: string
+            example: Bearer
+      content: {}
+    InternalServerError:
+      description: An unexpected error occurred.
       content:
         application/json:
           schema:
@@ -975,12 +1049,19 @@ components:
           maxLength: 150
         latitude:
           type: number
+          minimum: -90
+          maximum: 90
+          description: Latitude as an exact decimal with up to 7 fractional digits.
         longitude:
           type: number
+          minimum: -180
+          maximum: 180
+          description: Longitude as an exact decimal with up to 7 fractional digits.
         radiusMeters:
           type: integer
           format: int32
-          exclusiveMinimum: 0
+          minimum: 1
+          maximum: 2147483647
     UpdateOutletRequest:
       type: object
       description: Request body of PUT /api/v1/outlets/{outletId}.
@@ -991,12 +1072,19 @@ components:
           maxLength: 150
         latitude:
           type: number
+          minimum: -90
+          maximum: 90
+          description: Latitude as an exact decimal with up to 7 fractional digits.
         longitude:
           type: number
+          minimum: -180
+          maximum: 180
+          description: Longitude as an exact decimal with up to 7 fractional digits.
         radiusMeters:
           type: integer
           format: int32
-          exclusiveMinimum: 0
+          minimum: 1
+          maximum: 2147483647
     UpdateOutletGeofenceRequest:
       type: object
       description: Request body of PUT /api/v1/outlets/{outletId}/geofence.
@@ -1113,8 +1201,14 @@ components:
           enum: [CLOCK_IN, CLOCK_OUT]
         latitude:
           type: number
+          minimum: -90
+          maximum: 90
+          description: Latitude as an exact decimal with up to 7 fractional digits.
         longitude:
           type: number
+          minimum: -180
+          maximum: 180
+          description: Longitude as an exact decimal with up to 7 fractional digits.
     ManageAttendanceEntryRequest:
       type: object
       description: Request body of POST /api/v1/outlets/{outletId}/attendance/manage.
@@ -1131,8 +1225,14 @@ components:
           format: date-time
         latitude:
           type: number
+          minimum: -90
+          maximum: 90
+          description: Latitude as an exact decimal with up to 7 fractional digits.
         longitude:
           type: number
+          minimum: -180
+          maximum: 180
+          description: Longitude as an exact decimal with up to 7 fractional digits.
     UpdateAttendanceEntryRequest:
       type: object
       description: Request body of PUT /api/v1/outlets/{outletId}/attendance/{attendanceEntryId}.
@@ -1146,8 +1246,14 @@ components:
           format: date-time
         latitude:
           type: number
+          minimum: -90
+          maximum: 90
+          description: Latitude as an exact decimal with up to 7 fractional digits.
         longitude:
           type: number
+          minimum: -180
+          maximum: 180
+          description: Longitude as an exact decimal with up to 7 fractional digits.
     SalaryReportResponse:
       type: object
       description: A salary report for one employee in one outlet over a date range.
@@ -1226,8 +1332,8 @@ components:
     PageResponse:
       type: object
       description: |
-        A page of items. The `content` array holds endpoint-specific items,
-        for example `MembershipResponse` or `AttendanceEntryResponse`.
+        The pagination envelope. Concrete page schemas, for example
+        `PageResponseMembership`, refine the `content` items.
       properties:
         content:
           type: array
@@ -1252,6 +1358,24 @@ components:
           type: boolean
         empty:
           type: boolean
+    PageResponseMembership:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/MembershipResponse'
+    PageResponseAttendance:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/AttendanceEntryResponse'
     ErrorResponse:
       type: object
       description: The body returned for failed requests.

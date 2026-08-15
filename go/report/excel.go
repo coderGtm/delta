@@ -1,13 +1,30 @@
 package report
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/coderGtm/delta/go/decimal"
 	"github.com/coderGtm/delta/go/httpapi"
+	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 )
+
+// ExportExcel generates the Excel workbook for the salary report. Like the
+// reference flow it records the report event (via Calculate) and then the
+// export event and metric.
+func (s *Service) ExportExcel(ctx context.Context, ownerID, outletID, employeeID uuid.UUID, start, end time.Time, timezone string, hourlyRate *decimal.Decimal, ip, userAgent string) ([]byte, error) {
+	report, err := s.Calculate(ctx, ownerID, outletID, employeeID, start, end, timezone, hourlyRate, ip, userAgent)
+	if err != nil {
+		return nil, err
+	}
+	s.Metrics.Increment("report.salary.generated", "format", "xlsx")
+	s.Audit.Record(ctx, ownerID.String(), "SALARY_REPORT_EXCEL_GENERATED", "OUTLET", outletID,
+		map[string]any{"employeeUserId": employeeID, "startTime": start.UTC().Format(time.RFC3339Nano), "endTime": end.UTC().Format(time.RFC3339Nano), "timezone": report.Timezone, "format": "xlsx"}, ip, userAgent)
+	return s.BuildExcel(report)
+}
 
 // BuildExcel renders report as an XLSX workbook matching the reference export
 // layout: title, metadata, header, one row per day, and a total row. The

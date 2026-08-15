@@ -18,6 +18,7 @@ import (
 	"github.com/coderGtm/delta/go/httpapi"
 	"github.com/coderGtm/delta/go/metrics"
 	"github.com/coderGtm/delta/go/outlet"
+	"github.com/coderGtm/delta/go/report"
 	"github.com/coderGtm/delta/go/user"
 )
 
@@ -94,6 +95,11 @@ func main() {
 	apiMux.Handle("GET /api/v1/outlets/{outletId}/attendance/{attendanceEntryId}", auth.Require(http.HandlerFunc(attHandlers.Get)))
 	apiMux.Handle("PUT /api/v1/outlets/{outletId}/attendance/{attendanceEntryId}", auth.Require(http.HandlerFunc(attHandlers.Update)))
 	apiMux.Handle("DELETE /api/v1/outlets/{outletId}/attendance/{attendanceEntryId}", auth.Require(http.HandlerFunc(attHandlers.Delete)))
+
+	reportSvc := report.NewService(store, recorder, registry)
+	reportHandlers := &report.Handlers{Svc: reportSvc, TrustProxy: cfg.TrustProxyHeaders}
+	apiMux.Handle("GET /api/v1/outlets/{outletId}/reports/salary", auth.Require(http.HandlerFunc(reportHandlers.Salary)))
+	apiMux.Handle("GET /api/v1/outlets/{outletId}/reports/salary.xlsx", auth.Require(http.HandlerFunc(reportHandlers.SalaryXLSX)))
 
 	go refreshSvc.RunCleanupTicker(ctx, cfg.RefreshCleanupInterval)
 

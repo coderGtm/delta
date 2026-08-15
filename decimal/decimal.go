@@ -3,6 +3,7 @@
 package decimal
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -163,8 +164,16 @@ func (d Decimal) MarshalJSON() ([]byte, error) {
 	return []byte(d.Format(d.scale)), nil
 }
 
-// UnmarshalJSON parses a JSON number literal into d.
+// UnmarshalJSON parses a JSON number literal into d. A quoted numeric string
+// is also accepted, matching the lenient scalar coercion of the reference API.
 func (d *Decimal) UnmarshalJSON(b []byte) error {
+	if len(b) >= 2 && b[0] == '"' {
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		b = []byte(s)
+	}
 	v, err := Parse(b)
 	if err != nil {
 		return err

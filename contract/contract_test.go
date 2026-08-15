@@ -368,6 +368,25 @@ func TestContractEndpoints(t *testing.T) {
 		assertError(t, body, "NOT_FOUND", "Outlet not found: "+missing)
 	})
 
+	t.Run("outlet create accepts lenient JSON coercion", func(t *testing.T) {
+		server, _ := BuildTestServer(t)
+		client := server.Client()
+		ownerBearer := login(t, client, server.URL, "token-owner")
+
+		// A mobile client built against the previous API's JSON decoder may
+		// send quoted coordinates and a fractional radius; both must be accepted.
+		status, _, body := doJSON(t, client, http.MethodPost, server.URL+"/api/v1/outlets", ownerBearer,
+			map[string]any{"name": "HQ2", "latitude": "40.7128", "longitude": "-74.006", "radiusMeters": 500.0})
+		assertStatus(t, status, http.StatusCreated)
+		outletMap := decodeMap(t, body)
+		if outletMap["radiusMeters"] != float64(500) {
+			t.Errorf("lenient radiusMeters = %v, want 500", outletMap["radiusMeters"])
+		}
+		if outletMap["name"] != "HQ2" {
+			t.Errorf("lenient name = %v", outletMap["name"])
+		}
+	})
+
 	t.Run("membership lifecycle", func(t *testing.T) {
 		server, _ := BuildTestServer(t)
 		client := server.Client()

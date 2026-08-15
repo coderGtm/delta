@@ -20,7 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func intPtr(v int) *int { return &v }
+func intPtr(v int) *outlet.FlexInt { return (*outlet.FlexInt)(&v) }
 
 func mustDec(t *testing.T, s string) *decimal.Decimal {
 	t.Helper()

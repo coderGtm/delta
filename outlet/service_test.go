@@ -1,6 +1,7 @@
 package outlet
 
 import (
+	"encoding/json"
 	"math"
 	"math/big"
 	"strings"
@@ -20,7 +21,7 @@ func dec(t *testing.T, s string) *decimal.Decimal {
 	return d
 }
 
-func intPtr(v int) *int { return &v }
+func intPtr(v int) *FlexInt { return (*FlexInt)(&v) }
 
 func TestValidateOutlet(t *testing.T) {
 	if err := validateOutlet("HQ", dec(t, "10.5"), dec(t, "20.25"), intPtr(50)); err != nil {
@@ -119,5 +120,47 @@ func TestDecimalFromPgNumeric(t *testing.T) {
 		if _, err := decimalFromPgNumeric(n); err == nil {
 			t.Errorf("decimalFromPgNumeric(%+v) succeeded, want error", n)
 		}
+	}
+}
+
+func TestFlexIntUnmarshal(t *testing.T) {
+	cases := []struct {
+		in   string
+		want FlexInt
+	}{
+		{`500`, 500},
+		{`500.0`, 500},
+		{`500.75`, 500},
+		{`"500"`, 500},
+		{`"500.0"`, 500},
+		{`-5`, -5},
+	}
+	for _, tc := range cases {
+		var f FlexInt
+		if err := json.Unmarshal([]byte(tc.in), &f); err != nil {
+			t.Fatalf("Unmarshal(%s): %v", tc.in, err)
+		}
+		if f != tc.want {
+			t.Errorf("Unmarshal(%s) = %d, want %d", tc.in, f, tc.want)
+		}
+	}
+	if err := json.Unmarshal([]byte(`"abc"`), new(FlexInt)); err == nil {
+		t.Fatal("expected error for non-numeric string")
+	}
+}
+
+func TestCreateOutletRequestLenientDecode(t *testing.T) {
+	// The mobile client was built against a JSON decoder that coerces
+	// fractional integers and quoted numbers; both must be accepted.
+	payload := `{"name":"HQ","latitude":"40.7128","longitude":"-74.006","radiusMeters":500.0}`
+	var req CreateOutletRequest
+	if err := json.Unmarshal([]byte(payload), &req); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if ve := validateOutlet(req.Name, req.Latitude, req.Longitude, req.RadiusMeters); ve != nil {
+		t.Fatalf("valid outlet rejected: %v", ve)
+	}
+	if req.RadiusMeters == nil || *req.RadiusMeters != 500 {
+		t.Errorf("radius = %v, want 500", req.RadiusMeters)
 	}
 }

@@ -167,6 +167,28 @@ func TestJSONRoundTrip(t *testing.T) {
 	}
 }
 
+func TestUnmarshalJSONAcceptsQuotedNumbers(t *testing.T) {
+	for _, in := range []string{`"40.7128"`, `"-74.006"`, `"1e3"`, `"12"`} {
+		var d Decimal
+		if err := json.Unmarshal([]byte(in), &d); err != nil {
+			t.Fatalf("Unmarshal(%s): %v", in, err)
+		}
+		if d.coeff == nil {
+			t.Fatalf("Unmarshal(%s): zero coefficient", in)
+		}
+	}
+	if err := json.Unmarshal([]byte(`"not-a-number"`), &Decimal{}); err == nil {
+		t.Fatal("expected error for non-numeric string")
+	}
+	var holder struct{ V *Decimal }
+	if err := json.Unmarshal([]byte(`null`), &holder); err != nil {
+		t.Fatalf("null should leave pointer nil: %v", err)
+	}
+	if holder.V != nil {
+		t.Fatal("expected nil pointer for null")
+	}
+}
+
 func TestCmpInt(t *testing.T) {
 	cases := []struct {
 		in   string

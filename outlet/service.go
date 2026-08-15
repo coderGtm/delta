@@ -4,6 +4,7 @@ package outlet
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -35,13 +36,40 @@ func NewService(store *db.Store, a *audit.Recorder, m *metrics.Registry) *Servic
 	return &Service{Store: store, Audit: a, Metrics: m}
 }
 
+// FlexInt is an integer that also accepts fractional JSON numbers (truncated)
+// and quoted numeric strings, matching the lenient scalar coercion of the
+// reference API. Pointer fields distinguish a missing value from an explicit
+// zero.
+type FlexInt int
+
+// UnmarshalJSON decodes an integer, a fractional number, or a numeric string.
+func (f *FlexInt) UnmarshalJSON(b []byte) error {
+	s := string(b)
+	if len(b) >= 2 && b[0] == '"' {
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+	if err == nil {
+		*f = FlexInt(n)
+		return nil
+	}
+	fv, ferr := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	if ferr != nil {
+		return fmt.Errorf("invalid integer %q", s)
+	}
+	*f = FlexInt(int64(fv))
+	return nil
+}
+
 // CreateOutletRequest is the payload used to create a new outlet. Pointer
 // fields distinguish a missing value from an explicit zero.
 type CreateOutletRequest struct {
 	Name         string           `json:"name"`
 	Latitude     *decimal.Decimal `json:"latitude"`
 	Longitude    *decimal.Decimal `json:"longitude"`
-	RadiusMeters *int             `json:"radiusMeters"`
+	RadiusMeters *FlexInt         `json:"radiusMeters"`
 }
 
 // UpdateOutletRequest is the payload used to replace the editable details of
@@ -50,7 +78,7 @@ type UpdateOutletRequest struct {
 	Name         string           `json:"name"`
 	Latitude     *decimal.Decimal `json:"latitude"`
 	Longitude    *decimal.Decimal `json:"longitude"`
-	RadiusMeters *int             `json:"radiusMeters"`
+	RadiusMeters *FlexInt         `json:"radiusMeters"`
 }
 
 // OutletResponse is the API representation of an outlet.
@@ -68,7 +96,7 @@ type OutletResponse struct {
 // validateOutlet checks the request fields and returns a VALIDATION_ERROR API
 // error listing every failing constraint in field order, or nil when the
 // request is valid.
-func validateOutlet(name string, lat, lon *decimal.Decimal, radius *int) *httpapi.APIError {
+func validateOutlet(name string, lat, lon *decimal.Decimal, radius *FlexInt) *httpapi.APIError {
 	var msgs []string
 	if strings.TrimSpace(name) == "" {
 		msgs = append(msgs, "Outlet name is required")

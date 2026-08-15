@@ -107,7 +107,9 @@ func main() {
 		return pool.Ping(ctx)
 	}
 
-	handler := httpapi.NewRouter(logger, cfg, ready, registry.Handler(), auth.AttachUser(jwtSvc, store), apiMux)
+	rateLimiter := httpapi.NewRateLimiter(cfg.TrustProxyHeaders)
+
+	handler := httpapi.NewRouter(logger, cfg, ready, registry.Handler(), auth.AttachUser(jwtSvc, store), rateLimiter.Middleware, apiMux)
 
 	srv := &http.Server{
 		Addr:              ":" + strconv.Itoa(cfg.Port),

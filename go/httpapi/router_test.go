@@ -19,7 +19,7 @@ import (
 func TestRequestIDVisibleToRequestLog(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
-	handler := NewRouter(logger, config.Config{TrustProxyHeaders: true}, func(ctx context.Context) error { return nil }, nil, func(h http.Handler) http.Handler { return h }, http.NewServeMux())
+	handler := NewRouter(logger, config.Config{TrustProxyHeaders: true}, func(ctx context.Context) error { return nil }, nil, func(h http.Handler) http.Handler { return h }, func(h http.Handler) http.Handler { return h }, http.NewServeMux())
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/healthz", nil)

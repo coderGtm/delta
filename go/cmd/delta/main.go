@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coderGtm/delta/go/attendance"
 	"github.com/coderGtm/delta/go/audit"
 	"github.com/coderGtm/delta/go/auth"
 	"github.com/coderGtm/delta/go/config"
@@ -84,6 +85,15 @@ func main() {
 	apiMux.Handle("PUT /api/v1/outlets/{outletId}/memberships/{membershipId}/display-name", auth.Require(http.HandlerFunc(outletHandlers.UpdateDisplayName)))
 	apiMux.Handle("POST /api/v1/outlets/memberships/{membershipId}/accept", auth.Require(http.HandlerFunc(outletHandlers.AcceptInvite)))
 	apiMux.Handle("POST /api/v1/outlets/memberships/{membershipId}/reject", auth.Require(http.HandlerFunc(outletHandlers.RejectInvite)))
+
+	attSvc := attendance.NewService(store, nil, recorder, registry)
+	attHandlers := &attendance.Handlers{Svc: attSvc, TrustProxy: cfg.TrustProxyHeaders}
+	apiMux.Handle("POST /api/v1/outlets/{outletId}/attendance", auth.Require(http.HandlerFunc(attHandlers.CreateOwn)))
+	apiMux.Handle("POST /api/v1/outlets/{outletId}/attendance/manage", auth.Require(http.HandlerFunc(attHandlers.CreateManaged)))
+	apiMux.Handle("GET /api/v1/outlets/{outletId}/attendance", auth.Require(http.HandlerFunc(attHandlers.List)))
+	apiMux.Handle("GET /api/v1/outlets/{outletId}/attendance/{attendanceEntryId}", auth.Require(http.HandlerFunc(attHandlers.Get)))
+	apiMux.Handle("PUT /api/v1/outlets/{outletId}/attendance/{attendanceEntryId}", auth.Require(http.HandlerFunc(attHandlers.Update)))
+	apiMux.Handle("DELETE /api/v1/outlets/{outletId}/attendance/{attendanceEntryId}", auth.Require(http.HandlerFunc(attHandlers.Delete)))
 
 	go refreshSvc.RunCleanupTicker(ctx, cfg.RefreshCleanupInterval)
 

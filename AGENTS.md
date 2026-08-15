@@ -4,18 +4,19 @@ Guidance for coding agents working in this repository.
 
 ## Project summary
 
-`delta` is a Spring Boot employee attendance backend.
+`delta` is a Go employee attendance backend.
 
 Stack:
 
-- Java 25
-- Spring Boot 4
-- Spring Security
-- Spring Data JPA
+- Go 1.25
+- `net/http` with stdlib `ServeMux` (method + path patterns)
+- pgx/v5 (`pgxpool`)
+- SQLC (generated query layer)
+- golang-migrate (embedded migrations)
 - PostgreSQL
-- Flyway
 - Firebase Admin SDK
 - Local JWT access tokens and refresh tokens
+- Prometheus metrics
 - Docker / Docker Compose
 
 Current API version prefix:
@@ -26,22 +27,28 @@ Current API version prefix:
 
 ## API documentation
 
-- API docs are generated at runtime by `springdoc-openapi` (Swagger UI at `/docs`, spec at `/docs/openapi.yaml`).
-- Do not maintain a hand-written OpenAPI spec; the document is derived from controllers and DTOs.
-- Controller and DTO changes are reflected in the docs automatically.
+- The OpenAPI spec is hand-maintained at `go/httpapi/openapi.yaml` and served at `/docs` (embedded Swagger UI) and `/docs/openapi.yaml`.
+- Changes to handlers and DTOs must be reflected in the spec manually.
+- Contract tests in `go/contract` assert the runtime matches the spec.
 
 ## Important commands
 
 Run tests:
 
 ```bash
-./gradlew test
+cd go && make test
 ```
 
-Build jar:
+Build binary:
 
 ```bash
-./gradlew bootJar
+cd go && make build
+```
+
+Lint:
+
+```bash
+cd go && make lint
 ```
 
 Validate Docker Compose:
@@ -59,40 +66,49 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Regenerate sqlc code after editing `go/db/queries/*.sql`:
+
+```bash
+cd go/db && sqlc generate
+```
+
 ## Architectural rules
 
-- Keep controllers thin.
+- Keep handlers thin.
 - Put business logic in services.
 - Use DTOs for request/response payloads.
-- Do not expose JPA entities directly from controllers.
-- Use repositories only for persistence/query concerns.
+- Do not expose `db` models directly from handlers; map to response DTOs.
+- Keep persistence/query concerns in `go/db`; services use `db.Store` / `db.Querier`.
+- Use flat packages with one clear purpose and no import cycles; domain packages must not import each other sideways — `cmd/delta/main.go` is the wiring point.
 - Keep changes minimal and consistent with existing style.
-- Add Javadocs/comments for new public classes and non-obvious behavior.
+- Document every exported identifier with a doc comment; comment non-obvious behavior.
 - Prefer enums over lookup tables unless there is a strong reason otherwise.
+- No Java/Spring/JPA references in Go code.
 
 ## Persistence rules
 
-- Database schema is managed by Flyway migrations in:
+- Database schema is managed by golang-migrate migrations in:
 
 ```text
-src/main/resources/db/migration
+go/db/migrations
 ```
 
-- Do not rely on Hibernate to create/update production schema.
-- `spring.jpa.hibernate.ddl-auto=validate` is expected.
-- When changing entities, add a new Flyway migration.
+- Do not rely on any ORM to create/update production schema.
+- `AUTO_MIGRATE=true` applies migrations at startup (the default).
+- When changing entities, add a new golang-migrate migration.
 - Existing base auditing provides `createdAt` / `updatedAt`.
 - Attendance also has `createdBy` / `updatedBy` using the authenticated user ID.
 
 ## Authentication/security context
 
-- Authenticated principal is the local JPA `User` entity.
-- JWT filter loads only active users via `UserRepository.findByIdAndDeletedAtIsNull(...)`.
+- Authenticated principal is the local `db.User` row.
+- JWT middleware loads only active users (by id with `deleted_at` unset).
 - Public auth endpoints:
   - `/api/v1/auth/login`
   - `/api/v1/auth/refresh`
   - `/api/v1/auth/logout`
-- Most other endpoints require authentication.
+- Most other endpoints require authentication (`auth.Require`).
+- When no Firebase service account is configured, a stub client is used and login returns 401 `INVALID_TOKEN` ("Invalid Firebase ID Token").
 
 ## Domain rules
 
@@ -149,24 +165,23 @@ src/main/resources/db/migration
 
 ## Pagination
 
-Collection endpoints should use DB-level pagination with Spring Data `Pageable` and return `PageResponse<T>`.
+Collection endpoints should use DB-level pagination with `httpapi.PageParams` and return `PageResponse<T>`.
 
 Shared helpers:
 
 ```text
-common/dto/PageResponse.java
-common/util/PaginationUtils.java
-config/WebPaginationConfig.java
+httpapi.ParsePageParams / PageParams (go/httpapi/pagination.go)
+httpapi.NewPageResponse / WritePage (go/httpapi/response.go)
 ```
 
 ## Cross-cutting concerns
 
 ### Auditing
 
-Use `AuditService` for business events worth investigating later:
+Use `audit.Recorder` for business events worth investigating later:
 
 ```text
-common/audit/service/AuditService.java
+go/audit
 ```
 
 Examples:
@@ -180,23 +195,23 @@ Examples:
 
 ### Metrics
 
-Use `ApplicationMetrics` for business counters:
+Use `metrics.Registry` for business counters:
 
 ```text
-common/metrics/ApplicationMetrics.java
+go/metrics
 ```
 
 Metrics are exposed via Prometheus format at:
 
 ```text
-/actuator/prometheus
+/metrics
 ```
 
 Keep that endpoint private to monitoring systems.
 
 ### Request logging
 
-`RequestLoggingFilter` adds request IDs and request completion logs.
+`httpapi` middleware (`RequestID` + `RequestLog`) adds request IDs and request completion logs.
 
 Do not log:
 
@@ -208,7 +223,7 @@ Do not log:
 
 ### Rate limiting
 
-`RateLimitingFilter` provides in-memory single-instance rate limiting.
+`httpapi.RateLimiter` provides in-memory single-instance rate limiting.
 
 For horizontally scaled deployments, move rate limiting to Redis or the gateway/ingress layer.
 
@@ -217,13 +232,13 @@ For horizontally scaled deployments, move rate limiting to Redis or the gateway/
 For behavior changes:
 
 - Add/update service tests for business logic.
-- Add controller/integration tests for auth, authorization, validation, and endpoint response shape when relevant.
-- Run `./gradlew test` before finalizing.
+- Add handler/integration/contract tests for auth, authorization, validation, and endpoint response shape when relevant.
+- Run `make test` (`go test ./...`) before finalizing.
 
 ## Docker/deployment notes
 
-- Docker build uses Gradle wrapper.
-- Wrapper timeout/retries are configured in `gradle/wrapper/gradle-wrapper.properties`.
+- Docker build uses the Go toolchain via `go/Dockerfile` (multi-stage: `golang:1.25-alpine` builder, non-root `alpine` runtime).
+- The builder stage runs `go mod download` before copying sources; the module cache is not persisted between builds.
 - Runtime image runs as non-root user.
 - Local secrets should be in `.env` and `firebase/service-account.json`; both are ignored by Git.
 - Production secrets should come from the deployment platform secret manager.

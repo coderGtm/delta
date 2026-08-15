@@ -2,36 +2,48 @@
 
 ## Prerequisites
 
-- Java 25 for local Gradle runs
-- Docker and Docker Compose for containerized runs
+- Go 1.25+ for local builds and runs
+- Docker and Docker Compose (or rootless Podman with a Docker-compatible socket) for containerized runs
+- `make` for the build/test/lint shortcuts in `go/`
 - Firebase service-account JSON
-- PostgreSQL if running outside Docker
+- PostgreSQL if running outside Docker (the Go app only needs a `DATABASE_URL`)
+
+The testcontainers-based integration and contract suites in `go/contract`, `go/auth`, `go/outlet`, `go/attendance`, and `go/report` spin up a real PostgreSQL container, so they also need a working container runtime (Docker or rootless Podman).
 
 ## Local test/build commands
 
 From the repository root:
 
 ```bash
-./gradlew test
-./gradlew bootJar
+cd go
+make test
+make build
+make lint
 ```
+
+- `make test` runs `go test ./...`.
+- `make build` builds the `delta` binary from `./cmd/delta`.
+- `make lint` runs `go vet ./...` plus `gofmt -l .`.
 
 ## Environment variables
 
-The application reads configuration from environment variables with safe local defaults where appropriate.
+The application reads all configuration from environment variables (see `go/config/config.go`). Variables not listed below use their defaults.
 
-Important variables:
-
-| Variable | Purpose |
-| --- | --- |
-| `DATASOURCE_URL` | JDBC URL for PostgreSQL |
-| `DATASOURCE_USERNAME` | PostgreSQL username |
-| `DATASOURCE_PASSWORD` | PostgreSQL password |
-| `JWT_SECRET` | Secret used to sign local JWT access tokens |
-| `FIREBASE_SERVICE_ACCOUNT_PATH` | Path to Firebase service-account JSON |
-| `JAVA_OPTS` | Optional JVM options for Docker runtime |
-| `FLYWAY_BASELINE_ON_MIGRATE` | Set to `true` once if adopting Flyway on an existing non-empty DB |
-| `TRUST_PROXY_HEADERS` | `true` only when behind a trusted reverse proxy that overwrites `X-Forwarded-For`/`X-Real-IP`; set `false` for direct exposure to prevent IP rate-limit spoofing |
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `8080` | HTTP listen port |
+| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/delta` | PostgreSQL connection URL |
+| `AUTO_MIGRATE` | `true` | Apply golang-migrate migrations at startup |
+| `JWT_SECRET` | (none; required) | Secret used to sign local JWT access and refresh tokens |
+| `JWT_ACCESS_TOKEN_TTL` | `900000` (15 min) | Access token lifetime, milliseconds |
+| `JWT_REFRESH_TOKEN_TTL` | `2592000000` (30 days) | Refresh token lifetime, milliseconds |
+| `JWT_REFRESH_CLEANUP_INTERVAL` | `86400000` (24 h) | How often expired refresh tokens are cleaned up, milliseconds |
+| `JWT_REFRESH_REVOKED_RETENTION` | `604800000` (7 days) | How long revoked tokens are kept before permanent deletion, milliseconds |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | `firebase/service-account.json` | Path to the Firebase service-account JSON |
+| `PROMETHEUS_BEARER_TOKEN` | (empty) | Bearer token required to access `GET /metrics`; empty disables the gate |
+| `TRUST_PROXY_HEADERS` | `true` | Honor `X-Forwarded-For`/`X-Real-IP` for client-IP and rate-limit keys; set `false` for direct exposure to prevent IP rate-limit spoofing |
+| `LOG_LEVEL` | `info` | Structured log level (`info`, `debug`, ...) |
+| `LOG_FORMAT` | `text` | Log output format: `text` or `json` |
 
 ## Local Docker Compose setup
 
@@ -44,11 +56,8 @@ cp .env.example .env
 Edit `.env` and set local values:
 
 ```env
-POSTGRES_DB=delta
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
 JWT_SECRET=replace-this-with-a-long-random-production-secret-at-least-32-bytes
-JAVA_OPTS=-XX:MaxRAMPercentage=75.0
+PROMETHEUS_BEARER_TOKEN=replace-this-with-a-long-random-monitoring-token
 ```
 
 Place the Firebase service account at:
@@ -99,9 +108,32 @@ Stop and remove the Postgres volume:
 docker compose down -v
 ```
 
+## Ops endpoints
+
+The Go app exposes Go-native operational endpoints in addition to the `/api/v1` API:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /healthz` | Liveness: always `200 {"status":"UP"}` when the process is serving |
+| `GET /readyz` | Readiness: pings the database; `200 {"status":"UP"}` or `503 {"status":"DOWN","error":...}` |
+| `GET /metrics` | Prometheus text-format metrics; gated by `Authorization: Bearer <PROMETHEUS_BEARER_TOKEN>` when that variable is set |
+| `GET /docs` | Interactive Swagger UI (embedded) |
+| `GET /docs/openapi.yaml` | The hand-maintained OpenAPI spec |
+
+```bash
+curl http://localhost:8080/healthz
+curl http://localhost:8080/readyz
+```
+
+`/metrics` should normally be kept private to your monitoring network:
+
+```bash
+curl -H "Authorization: Bearer <PROMETHEUS_BEARER_TOKEN>" http://localhost:8080/metrics
+```
+
 ## API docs
 
-API docs are generated at runtime from controllers and DTOs using `springdoc-openapi`, so they always reflect the current API.
+The OpenAPI spec is hand-maintained at `go/httpapi/openapi.yaml` and embedded into the binary. Contract tests in `go/contract` assert that the runtime matches it.
 
 Interactive Swagger UI is available at:
 
@@ -114,8 +146,6 @@ The OpenAPI spec is available at:
 ```text
 http://localhost:8080/docs/openapi.yaml
 ```
-
-The JSON variant is served at `/docs/openapi`.
 
 Use this while building the Android app to inspect request/response models, auth requirements, and report query parameters.
 
@@ -140,40 +170,20 @@ Examples:
 
 ## Database migrations
 
-Schema is managed by Flyway:
+Schema is managed by golang-migrate, embedded into the binary:
 
 ```text
-src/main/resources/db/migration/V1__init_schema.sql
+go/db/migrations
 ```
 
-Hibernate is configured with:
-
-```properties
-spring.jpa.hibernate.ddl-auto=validate
+```text
+go/db/migrations/000001_init.up.sql
+go/db/migrations/000001_init.down.sql
 ```
 
-If you are starting from a fresh DB, no special action is needed.
+By default `AUTO_MIGRATE=true` applies all pending migrations at startup. If you are starting from a fresh DB, no special action is needed.
 
-If you are migrating an existing DB that was created with Hibernate `ddl-auto=update`, run once with:
-
-```env
-FLYWAY_BASELINE_ON_MIGRATE=true
-```
-
-Then turn it back off.
-
-## Health endpoints
-
-Public health/info endpoints:
-
-```bash
-curl http://localhost:8080/actuator/health
-curl http://localhost:8080/actuator/health/liveness
-curl http://localhost:8080/actuator/health/readiness
-curl http://localhost:8080/actuator/info
-```
-
-`/actuator/prometheus` requires authentication in the app and should normally be kept private to your monitoring network.
+Query code is generated by sqlc from hand-written queries in `go/db/queries/*.sql`; see `STRUCTURE.md`.
 
 ## Metrics and monitoring
 
@@ -198,7 +208,7 @@ http://localhost:9090
 Prometheus scrapes the app over the private Compose network at:
 
 ```text
-http://app:8080/actuator/prometheus
+http://app:8080/metrics
 ```
 
 It authenticates with the bearer token mounted from:
@@ -207,7 +217,7 @@ It authenticates with the bearer token mounted from:
 monitoring/prometheus/prometheus-token.txt
 ```
 
-This token must match `.env` value:
+This token must match the `.env` value:
 
 ```env
 PROMETHEUS_BEARER_TOKEN=...
@@ -219,16 +229,15 @@ Use the monitoring token, not a user JWT:
 
 ```bash
 curl -H "Authorization: Bearer <PROMETHEUS_BEARER_TOKEN>" \
-  http://localhost:8080/actuator/prometheus
+  http://localhost:8080/metrics
 ```
 
 This returns Prometheus text format metrics.
 
 Useful metric families include:
 
-- JVM metrics
+- Go runtime and process metrics
 - HTTP request metrics
-- datasource / Hikari metrics
 - custom business counters such as:
   - `auth_login_success_total`
   - `auth_refresh_success_total`
@@ -236,8 +245,6 @@ Useful metric families include:
   - `attendance_created_total`
   - `attendance_geofence_rejected_total`
   - `report_salary_generated_total`
-
-Micrometer converts dots in counter names to Prometheus underscores.
 
 ### Recommended Prometheus scrape config
 
@@ -248,12 +255,12 @@ Example:
 ```yaml
 scrape_configs:
   - job_name: delta-api
-    metrics_path: /actuator/prometheus
+    metrics_path: /metrics
     static_configs:
       - targets: ["delta-app:8080"]
 ```
 
-If Prometheus cannot use your JWT auth flow, secure `/actuator/prometheus` at the network or reverse-proxy layer instead:
+If Prometheus cannot use your bearer token, secure `/metrics` at the network or reverse-proxy layer instead:
 
 - private Docker/Kubernetes network
 - IP allowlist
@@ -261,7 +268,7 @@ If Prometheus cannot use your JWT auth flow, secure `/actuator/prometheus` at th
 - mTLS
 - reverse-proxy basic auth
 
-Do not expose `/actuator/prometheus` publicly.
+Do not expose `/metrics` publicly.
 
 ## Secrets guidance
 
@@ -296,9 +303,26 @@ For JWT, generate a long random value and inject it as:
 JWT_SECRET=<secret>
 ```
 
+## Testing
+
+Run the unit, integration, and contract suites:
+
+```bash
+cd go && make test
+```
+
+Integration and contract tests use [testcontainers-go](https://golang.testcontainers.org) and require a running container runtime.
+
+Under rootless Podman, container creation and Ryuk (the testcontainers reaper) behave differently. Disable Ryuk and point the Docker client at the Podman socket:
+
+```bash
+export TESTCONTAINERS_RYUK_DISABLED=true
+export DOCKER_HOST=unix:///run/user/<uid>/podman/podman.sock
+```
+
 ## Load and rate limit testing
 
-Quick load and rate-limit tests are available under `loadtest/` and run with [k6](https://k6.io) from your machine. They generate real HTTP load through the full stack (Security chain, JWT filter, rate-limiting filter, Hikari, Postgres).
+Quick load and rate-limit tests are available under `loadtest/` and run with [k6](https://k6.io) from your machine. They generate real HTTP load through the full stack (JWT auth, rate-limiting middleware, connection pool, Postgres).
 
 The scripts mint local HS256 access tokens with the same `JWT_SECRET` the app uses, so authenticated endpoints are tested without hitting Firebase or the login rate limit.
 
@@ -326,7 +350,7 @@ k6 run loadtest/smoke.js
 
 ### Capacity test
 
-Ramps 1 → 60 VUs against `GET /outlets/{id}/attendance` (deliberately chosen because it is not rate-limited, so the numbers reflect app + JVM + connection pool + DB capacity):
+Ramps 1 → 60 VUs against `GET /outlets/{id}/attendance` (deliberately chosen because it is not rate-limited, so the numbers reflect app + connection pool + DB capacity):
 
 ```bash
 k6 run loadtest/capacity.js
@@ -348,7 +372,7 @@ For a real-world baseline run this against your production-like hardware and Pos
 
 ### Rate limit tests
 
-Verifies the 429 boundaries from `RateLimitingFilter` (`loadtest/rate-limit.js`):
+Verifies the 429 boundaries from the in-memory rate limiter (`loadtest/rate-limit.js`):
 
 - `POST /api/v1/auth/login` → 10/min per IP
 - `POST /api/v1/auth/refresh` → 30/min per IP
@@ -385,14 +409,13 @@ All scripts read the same env vars (defaults in `loadtest/config.js`):
 
 The API is a stateless JSON service. Defaults and how to tighten them for production:
 
-- **SQL injection** — not applicable: all persistence uses Spring Data derived/parameterized queries; there is no raw SQL.
+- **SQL injection** — not applicable: all persistence goes through sqlc-generated, parameterized queries; there is no raw SQL in application code.
 - **Excel formula injection** — user-supplied outlet names and member display names written to salary report cells are sanitized on export, so values beginning with `=`, `+`, `-`, `@`, or control characters are rendered as text, not evaluated.
-- **Response headers** — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, a same-origin `Content-Security-Policy`, and HTTP `Strict-Transport-Security` (HSTS) are applied.
-  - **HSTS only ships over HTTPS.** Because `server.forward-headers-strategy=framework` is set, the app emits HSTS only when the request is detected as secure (`X-Forwarded-Proto: https` from a trusted proxy). Plain HTTP local development (`http://localhost:8080`) receives no HSTS header, so local dev is unaffected.
-- **Request body limits** — Tomcat rejects request bodies above 2 MB.
+- **Response headers** — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, a same-origin `Content-Security-Policy`, and HTTP `Strict-Transport-Security` (HSTS) are applied on every response.
+- **Request body limits** — request bodies over 2 MiB are rejected via `http.MaxBytesReader` (`413` for declared `Content-Length` over the limit).
 - **Proxy headers** — the app resolves client IPs from `X-Forwarded-For`/`X-Real-IP` only when `TRUST_PROXY_HEADERS=true`. Behind a public proxy, ensure it overwrites these headers from the trusted connection. When exposed directly, set `TRUST_PROXY_HEADERS=false` so the socket remote address is used and IP-based rate-limit keys cannot be spoofed.
 - **Rate limiting** — apply particularly to auth and write endpoints; the counters are in-memory (single instance). Move to Redis/gateway when scaling horizontally.
-- **`/actuator/prometheus`** — protected by a bearer token and intended for private monitoring networks only.
+- **`/metrics`** — protected by a bearer token (when `PROMETHEUS_BEARER_TOKEN` is set) and intended for private monitoring networks only.
 
 ## Report generation
 

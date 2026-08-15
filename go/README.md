@@ -73,6 +73,17 @@ See `../STRUCTURE.md` for the full tree.
 
 The client-facing API lives under `/api/v1` (e.g. `/api/v1/auth/login`, `/api/v1/outlets`).
 
+## Verification (2026-08-15)
+
+Final verification against the `go-rewrite` branch:
+
+- Gates: `go build ./...`, `go vet ./...`, `go test -count=1 ./...`, `gofmt -l .` all clean; no `java|spring|jpa` matches in Go sources.
+- Stack: `docker compose up --build -d postgres app` via rootless podman (`DOCKER_HOST=unix:///run/user/1000/podman/podman.sock`); `/healthz`, `/readyz`, `/docs/`, `/docs/openapi.yaml` all up.
+- k6: `smoke.js` PASS (10/10 checks, p95 11.9ms), `capacity.js` PASS (273,597 reqs @ ~1,300 rps, 0% failed, p95 53ms), `rate-limit.js` PASS (98/98 checks; 429 + `Retry-After` at every budget).
+- Metrics: `auth.login.success`, `outlet.created`, `attendance.created`, `outlet.membership.*`, `attendance.updated/deleted/geofence.rejected`, `report.salary.generated`, `user.deleted` (dotted names; exposed underscore-normalized, e.g. `outlet_created`).
+
+Caveat: `loadtest/seed.sql` is a Java-project artifact and does not provide `outlet_memberships.display_name`, which is `NOT NULL` in the Go schema. The memberships insert therefore fails; apply the rows with `display_name` (initialized to the account name) via SQL after running `loadtest/seed.sh`. The loadtest scripts themselves (`config.js`, `smoke.js`, `capacity.js`, `rate-limit.js`) are Go-compatible.
+
 ## Links
 
 - `../SETUP.md` — setup, configuration, monitoring, report usage.

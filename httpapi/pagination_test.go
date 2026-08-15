@@ -30,3 +30,17 @@ func TestParsePageParamsBadValuesFallBack(t *testing.T) {
 		t.Fatalf("fallback wrong: %+v", p)
 	}
 }
+
+func TestParsePageParamsClamps(t *testing.T) {
+	req := httptest.NewRequest("GET", "/x?page=999999999&size=50000", nil)
+	p := ParsePageParams(req)
+	if p.Size != maxSize {
+		t.Fatalf("size = %d, want %d", p.Size, maxSize)
+	}
+	if p.Page != maxPage {
+		t.Fatalf("page = %d, want %d", p.Page, maxPage)
+	}
+	if product := p.Page * p.Size; product > int(^uint32(0)>>1) {
+		t.Fatalf("page*size = %d overflows int32", product)
+	}
+}

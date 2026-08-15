@@ -47,6 +47,12 @@ func RateLimitExceeded(msg string) *APIError {
 	return &APIError{http.StatusTooManyRequests, "RATE_LIMIT_EXCEEDED", msg}
 }
 
+// PayloadTooLarge returns a 413 Request Entity Too Large API error with the
+// PAYLOAD_TOO_LARGE code.
+func PayloadTooLarge(msg string) *APIError {
+	return &APIError{http.StatusRequestEntityTooLarge, "PAYLOAD_TOO_LARGE", msg}
+}
+
 // Internal returns a 500 Internal Server Error API error with the
 // INTERNAL_ERROR code.
 func Internal(msg string) *APIError {

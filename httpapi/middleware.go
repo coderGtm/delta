@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log/slog"
@@ -43,12 +44,43 @@ func RequestIDFrom(r *http.Request) string {
 
 type statusRecorder struct {
 	http.ResponseWriter
-	status int
+	status      int
+	wroteHeader bool
 }
 
 func (r *statusRecorder) WriteHeader(status int) {
+	if r.wroteHeader {
+		return
+	}
+	r.wroteHeader = true
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
+}
+
+// Flush flushes the underlying writer when it supports http.Flusher, so
+// streaming responses preserve their flush behavior.
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Hijack hands the connection to the caller when the underlying writer
+// supports http.Hijacker, so hijacked connections (websockets) still work.
+func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := r.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, http.ErrNotSupported
+}
+
+// Push proxies an HTTP/2 server push when the underlying writer supports
+// http.Pusher.
+func (r *statusRecorder) Push(target string, opts *http.PushOptions) error {
+	if p, ok := r.ResponseWriter.(http.Pusher); ok {
+		return p.Push(target, opts)
+	}
+	return http.ErrNotSupported
 }
 
 // RequestLog returns middleware that logs a completion line for each request
@@ -106,7 +138,7 @@ func BodyLimit(maxBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.ContentLength > maxBytes {
-				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+				WriteError(w, PayloadTooLarge("Request body too large"))
 				return
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)

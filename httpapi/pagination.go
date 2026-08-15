@@ -1,9 +1,17 @@
 package httpapi
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
+)
+
+// Pagination caps: maxSize bounds the items-per-page, and maxPage keeps the
+// page*size offset within the int32 range used for SQL LIMIT/OFFSET values.
+const (
+	maxSize = 10000
+	maxPage = math.MaxInt32 / maxSize
 )
 
 // SortOrder is a single requested sort: a field name and whether it should be
@@ -23,7 +31,10 @@ type PageParams struct {
 
 // ParsePageParams extracts page, size, and sort parameters from the request
 // query string. Invalid or out-of-range values fall back to defaults (page 0,
-// size 20).
+// size 20). Valid values are clamped to keep them bounded: size is capped at
+// maxSize (10000) and page is capped at maxPage (214748), so the offset
+// page*size always fits in an int32 and cannot overflow the SQL LIMIT/OFFSET
+// values used by listing endpoints.
 func ParsePageParams(r *http.Request) PageParams {
 	p := PageParams{Page: 0, Size: 20}
 	if v := r.URL.Query().Get("page"); v != "" {
@@ -35,6 +46,12 @@ func ParsePageParams(r *http.Request) PageParams {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			p.Size = n
 		}
+	}
+	if p.Size > maxSize {
+		p.Size = maxSize
+	}
+	if p.Page > maxPage {
+		p.Page = maxPage
 	}
 	for _, raw := range r.URL.Query()["sort"] {
 		seg := strings.Split(raw, ",")

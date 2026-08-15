@@ -54,22 +54,22 @@ type SalaryReport struct {
 
 // hoursBetween returns the scale-2 hours between clockIn and clockOut,
 // rounding half up. Whole seconds only, matching the contract.
-func hoursBetween(clockIn, clockOut time.Time) (decimal.Decimal, error) {
+func hoursBetween(clockIn, clockOut time.Time) decimal.Decimal {
 	seconds := new(big.Int).SetInt64(int64(clockOut.Sub(clockIn) / time.Second))
 	n := new(big.Int).Mul(seconds, big.NewInt(100))
 	q, r := new(big.Int).QuoRem(n, big.NewInt(3600), new(big.Int))
 	if new(big.Int).Mul(r, big.NewInt(2)).Cmp(big.NewInt(3600)) >= 0 {
 		q.Add(q, big.NewInt(1))
 	}
-	return decimal.FromBigInt(q, 2), nil
+	return decimal.FromBigInt(q, 2)
 }
 
 // mul2 returns a*b rounded half up to scale 2.
-func mul2(a, b decimal.Decimal) (decimal.Decimal, error) {
+func mul2(a, b decimal.Decimal) decimal.Decimal {
 	coeff := new(big.Int).Mul(a.Unscaled(), b.Unscaled())
 	d := decimal.FromBigInt(coeff, a.Scale()+b.Scale())
 	d.ScaleTo(2)
-	return d, nil
+	return d
 }
 
 // sum2 returns the exact sum of scale-2 decimals as a scale-2 decimal.
@@ -93,7 +93,7 @@ func CompletedPairs(entries []db.AttendanceEntry) []Pair {
 			continue
 		}
 		if entry.Type == "CLOCK_OUT" && pending != nil && entry.EntryTime.Time.After(pending.EntryTime.Time) {
-			hours, _ := hoursBetween(pending.EntryTime.Time, entry.EntryTime.Time)
+			hours := hoursBetween(pending.EntryTime.Time, entry.EntryTime.Time)
 			pairs = append(pairs, Pair{
 				ClockIn:  pending.EntryTime.Time,
 				ClockOut: entry.EntryTime.Time,
@@ -145,7 +145,7 @@ func ValidateReportRequest(start, end time.Time, timezone string, hourlyRate *de
 // buildReport assembles a SalaryReport from attendance entries, grouping
 // completed pairs by local calendar day.
 func buildReport(outletID uuid.UUID, outletName string, employee *db.User, employeeDisplayName string,
-	start, end time.Time, loc *time.Location, hourlyRate decimal.Decimal, entries []db.AttendanceEntry) (*SalaryReport, error) {
+	start, end time.Time, loc *time.Location, hourlyRate decimal.Decimal, entries []db.AttendanceEntry) *SalaryReport {
 	byDate := groupByLocalDate(entries, loc)
 	s := start.In(loc)
 	e := end.Add(-time.Nanosecond).In(loc)
@@ -162,10 +162,7 @@ func buildReport(outletID uuid.UUID, outletName string, employee *db.User, emplo
 			hours = append(hours, p.Hours)
 		}
 		totalHours := sum2(hours)
-		salary, err := mul2(totalHours, hourlyRate)
-		if err != nil {
-			return nil, err
-		}
+		salary := mul2(totalHours, hourlyRate)
 		days = append(days, Day{
 			Date:       d.Format("2006-01-02"),
 			Pairs:      pairs,
@@ -191,7 +188,7 @@ func buildReport(outletID uuid.UUID, outletName string, employee *db.User, emplo
 		TotalHours:  sum2(dayHours),
 		TotalSalary: sum2(daySalaries),
 		Days:        days,
-	}, nil
+	}
 }
 
 // Service computes salary reports from completed attendance pairs.
@@ -281,10 +278,7 @@ func (s *Service) Calculate(ctx context.Context, ownerID, outletID, employeeID u
 	if err != nil {
 		return nil, err
 	}
-	report, err := buildReport(toUUID(outlet.ID), outlet.Name, &employee, member.DisplayName, start, end, loc, *hourlyRate, entries)
-	if err != nil {
-		return nil, err
-	}
+	report := buildReport(toUUID(outlet.ID), outlet.Name, &employee, member.DisplayName, start, end, loc, *hourlyRate, entries)
 	s.Metrics.Increment("report.salary.generated", "format", "json")
 	s.Audit.Record(ctx, ownerID.String(), "SALARY_REPORT_GENERATED", "OUTLET", outletID,
 		map[string]any{

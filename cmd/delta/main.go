@@ -29,6 +29,7 @@ func main() {
 		os.Exit(1)
 	}
 	logger := newLogger(cfg)
+	slog.SetDefault(logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

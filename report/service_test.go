@@ -96,11 +96,7 @@ func TestHoursBetween(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			h, err := hoursBetween(tc.in, tc.out)
-			if err != nil {
-				t.Fatalf("hoursBetween: %v", err)
-			}
-			if got := h.Format(2); got != tc.want {
+			if got := hoursBetween(tc.in, tc.out).Format(2); got != tc.want {
 				t.Errorf("hoursBetween = %s, want %s", got, tc.want)
 			}
 		})
@@ -174,10 +170,7 @@ func TestBuildReport(t *testing.T) {
 		Email: pgtype.Text{String: "alice@example.com", Valid: true},
 	}
 
-	report, err := buildReport(outletID, "Acme", employee, "Alice (custom)", start, end, loc, *dec(t, "10.5"), entries)
-	if err != nil {
-		t.Fatalf("buildReport: %v", err)
-	}
+	report := buildReport(outletID, "Acme", employee, "Alice (custom)", start, end, loc, *dec(t, "10.5"), entries)
 	if len(report.Days) != 2 {
 		t.Fatalf("got %d days, want 2", len(report.Days))
 	}
@@ -236,10 +229,7 @@ func TestBuildReport(t *testing.T) {
 		Name:  "Alice",
 		Email: pgtype.Text{},
 	}
-	report, err = buildReport(outletID, "Acme", deleted, "Alice (custom)", start, end, loc, *dec(t, "10.5"), nil)
-	if err != nil {
-		t.Fatalf("buildReport deleted user: %v", err)
-	}
+	report = buildReport(outletID, "Acme", deleted, "Alice (custom)", start, end, loc, *dec(t, "10.5"), nil)
 	b, err = json.Marshal(report)
 	if err != nil {
 		t.Fatalf("json.Marshal deleted user: %v", err)
@@ -264,10 +254,7 @@ func TestBuildReportDays(t *testing.T) {
 		Name:  "Bob",
 		Email: pgtype.Text{String: "bob@example.com", Valid: true},
 	}
-	report, err := buildReport(uuid.New(), "Acme", employee, "Bob", base, base.Add(2*time.Hour), loc, *dec(t, "10.5"), entries)
-	if err != nil {
-		t.Fatalf("buildReport: %v", err)
-	}
+	report := buildReport(uuid.New(), "Acme", employee, "Bob", base, base.Add(2*time.Hour), loc, *dec(t, "10.5"), entries)
 	if got := report.Days[0].TotalHours.Format(2); got != "1.01" {
 		t.Errorf("totalHours = %s, want 1.01", got)
 	}

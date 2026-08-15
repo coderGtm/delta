@@ -1,0 +1,1268 @@
+openapi: 3.0.3
+info:
+  title: delta
+  description: |
+    Employee attendance API. This specification is hand-maintained and
+    documents the current behavior of the served application, which remains
+    authoritative.
+  version: 1.0.0
+servers:
+  - url: /
+tags:
+  - name: Health
+    description: Liveness and readiness probes.
+  - name: Auth
+    description: Firebase sign-in, token refresh, and logout.
+  - name: Users
+    description: The signed-in user's own account.
+  - name: Outlets
+    description: Outlets and outlet memberships.
+  - name: Attendance
+    description: Attendance entries and geofence enforcement.
+  - name: Reports
+    description: Salary reports.
+security:
+  - bearerAuth: []
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Returns 200 while the process is serving requests.
+      security: []
+      responses:
+        '200':
+          description: Service is alive.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Returns 200 when dependencies are available and 503 otherwise.
+      security: []
+      responses:
+        '200':
+          description: Service is ready.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+        '503':
+          description: A dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: DOWN
+                  error:
+                    type: string
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Sign in with a Firebase ID token
+      description: |
+        Verifies a Firebase ID token and returns an access token and a fresh
+        refresh token for the matching user, creating the user row on first
+        sign-in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: The signed-in user and a token pair.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate a refresh token
+      description: |
+        Revokes the supplied refresh token, issues a fresh refresh token for
+        the same user, and returns it together with a new access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: The rotated token pair.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke a refresh token
+      description: Revokes the supplied refresh token so it can no longer be used.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204':
+          description: Token revoked.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Revoke all refresh tokens
+      description: Revokes every refresh token belonging to the authenticated user.
+      responses:
+        '204':
+          description: All tokens revoked.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/users/me:
+    delete:
+      tags: [Users]
+      summary: Delete the current account
+      description: |
+        Soft-deletes the authenticated user's account: removes the Firebase
+        account, revokes every refresh token, and marks the local user row
+        deleted.
+      responses:
+        '204':
+          description: Account deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/outlets:
+    post:
+      tags: [Outlets]
+      summary: Create an outlet
+      description: |
+        Creates a new outlet and an accepted owner membership for the
+        authenticated user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOutletRequest'
+      responses:
+        '201':
+          description: The created outlet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutletResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/outlets/{outletId}:
+    get:
+      tags: [Outlets]
+      summary: Get an outlet
+      description: Returns an outlet to a user with an accepted membership.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+      responses:
+        '200':
+          description: The outlet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutletResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Outlets]
+      summary: Update an outlet
+      description: Replaces the editable details of an outlet. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOutletRequest'
+      responses:
+        '200':
+          description: The updated outlet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutletResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Outlets]
+      summary: Delete an outlet
+      description: Soft-deletes an outlet on behalf of an accepted owner.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+      responses:
+        '204':
+          description: Outlet deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/outlets/{outletId}/geofence:
+    put:
+      tags: [Outlets]
+      summary: Toggle attendance geofencing
+      description: Enables or disables geofence enforcement for an outlet. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOutletGeofenceRequest'
+      responses:
+        '200':
+          description: The updated outlet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutletResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/outlets/mine:
+    get:
+      tags: [Outlets]
+      summary: List accepted outlets
+      description: Lists the outlets the authenticated user has already joined.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+      responses:
+        '200':
+          description: A page of the user's outlet memberships.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/outlets/invites:
+    get:
+      tags: [Outlets]
+      summary: List pending invitations
+      description: Lists the pending outlet invitations for the authenticated user.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+      responses:
+        '200':
+          description: A page of the user's pending invitations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/outlets/{outletId}/memberships:
+    get:
+      tags: [Outlets]
+      summary: List outlet memberships
+      description: Lists the non-removed memberships of an outlet. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+      responses:
+        '200':
+          description: A page of the outlet's memberships.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/outlets/{outletId}/leave:
+    post:
+      tags: [Outlets]
+      summary: Leave an outlet
+      description: |
+        Soft-removes the authenticated user's own membership in the outlet.
+        Owners cannot leave through this endpoint.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+      responses:
+        '204':
+          description: Membership removed.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/outlets/{outletId}/memberships/invite:
+    post:
+      tags: [Outlets]
+      summary: Invite a member
+      description: Invites an existing active user to join the outlet as an employee. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteOutletMemberRequest'
+      responses:
+        '201':
+          description: The created or reopened membership.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/outlets/{outletId}/memberships/{membershipId}:
+    delete:
+      tags: [Outlets]
+      summary: Remove a member
+      description: Soft-removes an employee's membership in an outlet. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+        - $ref: '#/components/parameters/MembershipIdParam'
+      responses:
+        '204':
+          description: Membership removed.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/outlets/{outletId}/memberships/{membershipId}/display-name:
+    put:
+      tags: [Outlets]
+      summary: Set a member display name
+      description: Sets the owner-controlled display name of a member of the outlet. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+        - $ref: '#/components/parameters/MembershipIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMembershipDisplayNameRequest'
+      responses:
+        '200':
+          description: The updated membership.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/outlets/memberships/{membershipId}/accept:
+    post:
+      tags: [Outlets]
+      summary: Accept an invitation
+      description: Accepts a pending outlet invitation for the authenticated user.
+      parameters:
+        - $ref: '#/components/parameters/MembershipIdParam'
+      responses:
+        '200':
+          description: The accepted membership.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/outlets/memberships/{membershipId}/reject:
+    post:
+      tags: [Outlets]
+      summary: Reject an invitation
+      description: Rejects a pending outlet invitation for the authenticated user.
+      parameters:
+        - $ref: '#/components/parameters/MembershipIdParam'
+      responses:
+        '200':
+          description: The rejected membership.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/outlets/{outletId}/attendance:
+    post:
+      tags: [Attendance]
+      summary: Record own attendance
+      description: |
+        Records the authenticated employee's own attendance entry using the
+        current server UTC time. Coordinates must be inside the outlet
+        geofence when enforcement is enabled.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAttendanceEntryRequest'
+      responses:
+        '201':
+          description: The created attendance entry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceEntryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    get:
+      tags: [Attendance]
+      summary: List attendance entries
+      description: |
+        Returns a page of attendance entries. Owners may view every entry or
+        filter by user; employees only receive their own records.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+        - $ref: '#/components/parameters/AttendanceUserIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+      responses:
+        '200':
+          description: A page of attendance entries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/outlets/{outletId}/attendance/manage:
+    post:
+      tags: [Attendance]
+      summary: Record attendance for an employee
+      description: |
+        Records an attendance entry for an employee on behalf of an accepted
+        outlet owner, using the provided entry time. The target must be an
+        accepted employee of the outlet.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManageAttendanceEntryRequest'
+      responses:
+        '201':
+          description: The created attendance entry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceEntryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/outlets/{outletId}/attendance/{attendanceEntryId}:
+    get:
+      tags: [Attendance]
+      summary: Get an attendance entry
+      description: |
+        Returns a single attendance entry. Owners may view any entry;
+        employees may only view their own.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+        - $ref: '#/components/parameters/AttendanceEntryIdParam'
+      responses:
+        '200':
+          description: The attendance entry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceEntryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Attendance]
+      summary: Update an attendance entry
+      description: Replaces the type, time, and location of an attendance entry. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+        - $ref: '#/components/parameters/AttendanceEntryIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAttendanceEntryRequest'
+      responses:
+        '200':
+          description: The updated attendance entry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceEntryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      tags: [Attendance]
+      summary: Delete an attendance entry
+      description: Removes an attendance entry on behalf of an accepted outlet owner.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+        - $ref: '#/components/parameters/AttendanceEntryIdParam'
+      responses:
+        '204':
+          description: Attendance entry deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/outlets/{outletId}/reports/salary:
+    get:
+      tags: [Reports]
+      summary: Generate a salary report
+      description: |
+        Builds the salary report for one employee in one outlet over an exact
+        timestamp range, grouped daily by the provided timezone. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+        - $ref: '#/components/parameters/ReportUserIdParam'
+        - $ref: '#/components/parameters/ReportStartTimeParam'
+        - $ref: '#/components/parameters/ReportEndTimeParam'
+        - $ref: '#/components/parameters/ReportTimezoneParam'
+        - $ref: '#/components/parameters/ReportHourlyRateParam'
+      responses:
+        '200':
+          description: The salary report.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalaryReportResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/outlets/{outletId}/reports/salary.xlsx:
+    get:
+      tags: [Reports]
+      summary: Export a salary report as Excel
+      description: |
+        Builds the salary report for one employee in one outlet over an exact
+        timestamp range and returns it as an Excel workbook. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+        - $ref: '#/components/parameters/ReportUserIdParam'
+        - $ref: '#/components/parameters/ReportStartTimeParam'
+        - $ref: '#/components/parameters/ReportEndTimeParam'
+        - $ref: '#/components/parameters/ReportTimezoneParam'
+        - $ref: '#/components/parameters/ReportHourlyRateParam'
+      responses:
+        '200':
+          description: The salary report as an Excel workbook.
+          headers:
+            Content-Disposition:
+              description: Attachment filename for the workbook.
+              schema:
+                type: string
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    OutletIdParam:
+      name: outletId
+      in: path
+      required: true
+      description: The outlet ID.
+      schema:
+        type: string
+        format: uuid
+    MembershipIdParam:
+      name: membershipId
+      in: path
+      required: true
+      description: The membership ID.
+      schema:
+        type: string
+        format: uuid
+    AttendanceEntryIdParam:
+      name: attendanceEntryId
+      in: path
+      required: true
+      description: The attendance entry ID.
+      schema:
+        type: string
+        format: uuid
+    PageParam:
+      name: page
+      in: query
+      description: Zero-based page number.
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+    SizeParam:
+      name: size
+      in: query
+      description: Number of items per page.
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        default: 20
+    SortParam:
+      name: sort
+      in: query
+      description: |
+        Sort specification in the form `field,direction`, where direction is
+        `asc` or `desc`. May be repeated to sort by multiple fields. Supported
+        fields depend on the endpoint.
+      required: false
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+    AttendanceUserIdParam:
+      name: userId
+      in: query
+      description: |
+        Filters the page to one user's entries. Owners may filter by any
+        user; employees always receive only their own records.
+      required: false
+      schema:
+        type: string
+        format: uuid
+    ReportUserIdParam:
+      name: userId
+      in: query
+      required: true
+      description: The employee the report is generated for.
+      schema:
+        type: string
+        format: uuid
+    ReportStartTimeParam:
+      name: startTime
+      in: query
+      required: true
+      description: Start of the report range as an ISO-8601 instant.
+      schema:
+        type: string
+        format: date-time
+    ReportEndTimeParam:
+      name: endTime
+      in: query
+      required: true
+      description: End of the report range as an ISO-8601 instant.
+      schema:
+        type: string
+        format: date-time
+    ReportTimezoneParam:
+      name: timezone
+      in: query
+      required: true
+      description: IANA timezone name used for daily grouping.
+      schema:
+        type: string
+    ReportHourlyRateParam:
+      name: hourlyRate
+      in: query
+      required: true
+      description: Hourly rate used to compute salaries.
+      schema:
+        type: number
+        exclusiveMinimum: 0
+  responses:
+    BadRequest:
+      description: The request body or query parameters failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: The request lacks a valid access token or the supplied credential is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: The authenticated user is not allowed to perform the action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: The request conflicts with the current state of the resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: The request exceeded the endpoint rate limit.
+      headers:
+        Retry-After:
+          description: Seconds until the rate limit window resets.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    LoginRequest:
+      type: object
+      description: Request body of POST /api/v1/auth/login.
+      required: [firebaseIdToken]
+      properties:
+        firebaseIdToken:
+          type: string
+          minLength: 1
+          maxLength: 8192
+          description: Firebase ID token minted for the signing-in user.
+    RefreshRequest:
+      type: object
+      description: Request body of POST /api/v1/auth/refresh.
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          minLength: 1
+          maxLength: 512
+    LogoutRequest:
+      type: object
+      description: Request body of POST /api/v1/auth/logout.
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          minLength: 1
+          maxLength: 512
+    LoginResponse:
+      type: object
+      description: The signed-in user and a fresh token pair.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        accessToken:
+          type: string
+          description: JWT access token.
+        refreshToken:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RefreshTokenResponse:
+      type: object
+      description: A rotated access and refresh token pair.
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+    OutletResponse:
+      type: object
+      description: An outlet.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        latitude:
+          type: number
+          description: Latitude as an exact decimal with up to 7 fractional digits.
+        longitude:
+          type: number
+          description: Longitude as an exact decimal with up to 7 fractional digits.
+        radiusMeters:
+          type: integer
+          format: int32
+        geofenceEnabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateOutletRequest:
+      type: object
+      description: Request body of POST /api/v1/outlets.
+      required: [name, latitude, longitude, radiusMeters]
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        latitude:
+          type: number
+        longitude:
+          type: number
+        radiusMeters:
+          type: integer
+          format: int32
+          exclusiveMinimum: 0
+    UpdateOutletRequest:
+      type: object
+      description: Request body of PUT /api/v1/outlets/{outletId}.
+      required: [name, latitude, longitude, radiusMeters]
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        latitude:
+          type: number
+        longitude:
+          type: number
+        radiusMeters:
+          type: integer
+          format: int32
+          exclusiveMinimum: 0
+    UpdateOutletGeofenceRequest:
+      type: object
+      description: Request body of PUT /api/v1/outlets/{outletId}/geofence.
+      required: [geofenceEnabled]
+      properties:
+        geofenceEnabled:
+          type: boolean
+    MembershipResponse:
+      type: object
+      description: A user's membership in an outlet.
+      properties:
+        membershipId:
+          type: string
+          format: uuid
+        outlet:
+          $ref: '#/components/schemas/OutletResponse'
+        userId:
+          type: string
+          format: uuid
+        userName:
+          type: string
+        userEmail:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [OWNER, EMPLOYEE]
+        status:
+          type: string
+          enum: [ACCEPTED, INVITED, REJECTED]
+        invitedByUserId:
+          type: string
+          format: uuid
+          nullable: true
+        invitedByUserName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    InviteOutletMemberRequest:
+      type: object
+      description: Request body of POST /api/v1/outlets/{outletId}/memberships/invite.
+      required: [email]
+      properties:
+        email:
+          type: string
+    UpdateMembershipDisplayNameRequest:
+      type: object
+      description: Request body of PUT /api/v1/outlets/{outletId}/memberships/{membershipId}/display-name.
+      required: [displayName]
+      properties:
+        displayName:
+          type: string
+          maxLength: 255
+    AttendanceEntryResponse:
+      type: object
+      description: An attendance entry.
+      properties:
+        id:
+          type: string
+          format: uuid
+        outletId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userName:
+          type: string
+        userEmail:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+        type:
+          type: string
+          enum: [CLOCK_IN, CLOCK_OUT]
+        entryTime:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+          description: Latitude as an exact decimal with up to 7 fractional digits.
+        longitude:
+          type: number
+          description: Longitude as an exact decimal with up to 7 fractional digits.
+        createdByUserId:
+          type: string
+          format: uuid
+          nullable: true
+        updatedByUserId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateAttendanceEntryRequest:
+      type: object
+      description: Request body of POST /api/v1/outlets/{outletId}/attendance.
+      required: [type, latitude, longitude]
+      properties:
+        type:
+          type: string
+          enum: [CLOCK_IN, CLOCK_OUT]
+        latitude:
+          type: number
+        longitude:
+          type: number
+    ManageAttendanceEntryRequest:
+      type: object
+      description: Request body of POST /api/v1/outlets/{outletId}/attendance/manage.
+      required: [userId, type, entryTime, latitude, longitude]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [CLOCK_IN, CLOCK_OUT]
+        entryTime:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+        longitude:
+          type: number
+    UpdateAttendanceEntryRequest:
+      type: object
+      description: Request body of PUT /api/v1/outlets/{outletId}/attendance/{attendanceEntryId}.
+      required: [type, entryTime, latitude, longitude]
+      properties:
+        type:
+          type: string
+          enum: [CLOCK_IN, CLOCK_OUT]
+        entryTime:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+        longitude:
+          type: number
+    SalaryReportResponse:
+      type: object
+      description: A salary report for one employee in one outlet over a date range.
+      properties:
+        outletId:
+          type: string
+          format: uuid
+        outletName:
+          type: string
+        userId:
+          type: string
+          format: uuid
+        userName:
+          type: string
+        userEmail:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        timezone:
+          type: string
+          description: IANA timezone used for daily grouping.
+        hourlyRate:
+          type: number
+          description: Exact decimal with 2 fractional digits.
+        totalHours:
+          type: number
+          description: Exact decimal with 2 fractional digits.
+        totalSalary:
+          type: number
+          description: Exact decimal with 2 fractional digits.
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailySalaryReportResponse'
+    DailySalaryReportResponse:
+      type: object
+      description: One local calendar day of a salary report.
+      properties:
+        date:
+          type: string
+          format: date
+          description: Local calendar date in the report timezone.
+        attendancePairs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttendancePairReportResponse'
+        totalHours:
+          type: number
+          description: Exact decimal with 2 fractional digits.
+        hourlyRate:
+          type: number
+          description: Exact decimal with 2 fractional digits.
+        salary:
+          type: number
+          description: Exact decimal with 2 fractional digits.
+    AttendancePairReportResponse:
+      type: object
+      description: A completed clock-in/clock-out pair.
+      properties:
+        clockIn:
+          type: string
+          format: date-time
+        clockOut:
+          type: string
+          format: date-time
+        hours:
+          type: number
+          description: Exact decimal with 2 fractional digits.
+    PageResponse:
+      type: object
+      description: |
+        A page of items. The `content` array holds endpoint-specific items,
+        for example `MembershipResponse` or `AttendanceEntryResponse`.
+      properties:
+        content:
+          type: array
+          items: {}
+        page:
+          type: integer
+          format: int32
+          description: Zero-based page number.
+        size:
+          type: integer
+          format: int32
+          description: Number of items per page.
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    ErrorResponse:
+      type: object
+      description: The body returned for failed requests.
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code, for example NOT_FOUND.
+        message:
+          type: string
+          description: Human-readable error message.
+        timestamp:
+          type: string
+          format: date-time
+          description: Time the error was generated, in UTC.

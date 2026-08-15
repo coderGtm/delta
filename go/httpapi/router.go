@@ -10,18 +10,21 @@ import (
 	"github.com/coderGtm/delta/go/config"
 )
 
-// NewRouter registers the health, readiness, and metrics endpoints on mux and
-// wraps it in the request middleware chain. The ready func is injected by
-// main; it currently pings the database. metricsHandler is exposed under
-// /metrics, gated by a bearer token when cfg.PrometheusBearerToken is
-// non-empty. attach applies domain-specific authentication middleware between
-// the request log and the mux, so authenticated subjects are resolved before
+// NewRouter registers the API documentation, health, readiness, and metrics
+// endpoints on mux and wraps it in the request middleware chain. The
+// hand-maintained OpenAPI specification and the embedded Swagger UI are served
+// under /docs/. The ready func is injected by main; it currently pings the
+// database. metricsHandler is exposed under /metrics, gated by a bearer token
+// when cfg.PrometheusBearerToken is non-empty. attach applies
+// domain-specific authentication middleware between the request log and the
+// mux, so authenticated subjects are resolved before
 // any request-completion logging line runs. rate sits inside attach, applying
 // rate limiting after authentication so counters are keyed by the
 // authenticated subject where the policy requires it; rate-limited requests
 // still flow out through attach and RequestLog, so they are logged with their
 // userId and request id.
 func NewRouter(logger *slog.Logger, cfg config.Config, ready func(ctx context.Context) error, metricsHandler http.Handler, attach func(http.Handler) http.Handler, rate func(http.Handler) http.Handler, mux *http.ServeMux) http.Handler {
+	mux.Handle("GET /docs/", DocsHandler())
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusOK, map[string]string{"status": "UP"})
 	})

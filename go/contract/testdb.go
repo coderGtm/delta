@@ -38,6 +38,9 @@ func Setup(t *testing.T) *db.Store {
 		Started:          true,
 	})
 	if err != nil {
+		// Under rootless podman the Ryuk reaper container cannot start; the
+		// suite can run without it via TESTCONTAINERS_RYUK_DISABLED=true
+		// because t.Cleanup already terminates the containers.
 		t.Skipf("docker unavailable: %v", err)
 		return nil
 	}

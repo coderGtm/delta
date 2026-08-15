@@ -291,12 +291,12 @@ func TestContractEndpoints(t *testing.T) {
 		var third, fourth struct {
 			RefreshToken string `json:"refreshToken"`
 		}
-		_, _, body = doJSON(t, client, http.MethodPost, server.URL+"/api/v1/auth/login", "",
-			map[string]any{"firebaseIdToken": "token-owner"})
-		_ = json.Unmarshal(body, &third)
-		_, _, body = doJSON(t, client, http.MethodPost, server.URL+"/api/v1/auth/login", "",
-			map[string]any{"firebaseIdToken": "token-owner"})
-		_ = json.Unmarshal(body, &fourth)
+		if err := json.Unmarshal(mustLogin(t, client, server, "token-owner"), &third); err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(mustLogin(t, client, server, "token-owner"), &fourth); err != nil {
+			t.Fatal(err)
+		}
 		ownerBearer := login(t, client, server.URL, "token-owner")
 
 		status, _, _ = doJSON(t, client, http.MethodPost, server.URL+"/api/v1/auth/logout-all", ownerBearer, nil)
@@ -693,8 +693,10 @@ func TestContractEndpoints(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// The client-side RemoteAddr is never transmitted to the server, so
+			// all requests here share the server's TCP peer IP, which is what
+			// the login rate limit is keyed on.
 			req.Header.Set("Content-Type", "application/json")
-			req.RemoteAddr = "203.0.113.9:40000"
 			resp, err := client.Do(req)
 			if err != nil {
 				t.Fatalf("login request %d: %v", i, err)

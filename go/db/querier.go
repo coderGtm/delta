@@ -31,6 +31,7 @@ type Querier interface {
 	GetMembershipByOutletAndUserIncludingRemoved(ctx context.Context, arg GetMembershipByOutletAndUserIncludingRemovedParams) (OutletMembership, error)
 	GetMembershipDetailsByID(ctx context.Context, id pgtype.UUID) (GetMembershipDetailsByIDRow, error)
 	GetOutletByID(ctx context.Context, id pgtype.UUID) (Outlet, error)
+	GetOutletByIDIncludingDeleted(ctx context.Context, id pgtype.UUID) (Outlet, error)
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetUserByAuthUID(ctx context.Context, authUid pgtype.Text) (User, error)
 	GetUserByEmailCaseInsensitive(ctx context.Context, lower string) (User, error)

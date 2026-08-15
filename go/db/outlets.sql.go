@@ -325,6 +325,28 @@ func (q *Queries) GetOutletByID(ctx context.Context, id pgtype.UUID) (Outlet, er
 	return i, err
 }
 
+const GetOutletByIDIncludingDeleted = `-- name: GetOutletByIDIncludingDeleted :one
+SELECT id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at FROM outlets WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetOutletByIDIncludingDeleted(ctx context.Context, id pgtype.UUID) (Outlet, error) {
+	row := q.db.QueryRow(ctx, GetOutletByIDIncludingDeleted, id)
+	var i Outlet
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Latitude,
+		&i.Longitude,
+		&i.RadiusMeters,
+		&i.GeofenceEnabled,
+		&i.RemovedAt,
+		&i.RemovedByUserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const ListMembershipsForOutlet = `-- name: ListMembershipsForOutlet :many
 SELECT m.id, m.outlet_id, m.user_id, m.role, m.status, m.display_name, m.invited_by_user_id, m.removed_at, m.removed_by_user_id, m.created_at, m.updated_at, u.id AS user_id, u.name AS user_name, u.email AS user_email,
        iu.id AS invited_by_user_id, iu.name AS invited_by_user_name

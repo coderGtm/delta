@@ -6,6 +6,9 @@ RETURNING *;
 -- name: GetOutletByID :one
 SELECT * FROM outlets WHERE id = $1 AND removed_at IS NULL LIMIT 1;
 
+-- name: GetOutletByIDIncludingDeleted :one
+SELECT * FROM outlets WHERE id = $1 LIMIT 1;
+
 -- name: UpdateOutlet :one
 UPDATE outlets
 SET name = $2, latitude = $3, longitude = $4, radius_meters = $5, updated_at = now()

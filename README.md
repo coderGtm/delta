@@ -78,7 +78,7 @@ Final verification against the `go-rewrite` branch:
 - Gates: `go build ./...`, `go vet ./...`, `go test -count=1 ./...`, `gofmt -l .` all clean; no `java|spring|jpa` matches in Go sources.
 - Stack: `docker compose up --build -d postgres app` via rootless podman (`DOCKER_HOST=unix:///run/user/1000/podman/podman.sock`); `/healthz`, `/readyz`, `/docs/`, `/docs/openapi.yaml` all up.
 - k6: `smoke.js` PASS (10/10 checks, p95 11.9ms), `capacity.js` PASS (273,597 reqs @ ~1,300 rps, 0% failed, p95 53ms), `rate-limit.js` PASS (98/98 checks; 429 + `Retry-After` at every budget).
-- Metrics: `auth.login.success`, `outlet.created`, `attendance.created`, `outlet.membership.*`, `attendance.updated/deleted/geofence.rejected`, `report.salary.generated`, `user.deleted`, plus HTTP `http_requests_total` / `http_request_duration_seconds` and DB `delta_db_connections_total` / `delta_db_connections_idle` (dotted business names are exposed underscore-normalized, e.g. `outlet_created`).
+- Metrics: `auth_login_success_total`, `outlet_created_total`, `attendance_created_total`, `outlet_membership_*_total`, `attendance_updated_total`/`attendance_deleted_total`/`attendance_geofence_rejected_total`, `report_salary_generated_total`, `user_deleted_total`, plus HTTP `http_requests_total` / `http_request_duration_seconds` and DB `delta_db_connections_total` / `delta_db_connections_idle`.
 
 ## Links
 

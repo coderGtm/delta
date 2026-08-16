@@ -33,6 +33,16 @@ type Service struct {
 
 // NewService returns a Service wired to the given dependencies.
 func NewService(store *db.Store, a *audit.Recorder, m *metrics.Registry) *Service {
+	m.RegisterCounter("outlet_created_total", nil)
+	m.RegisterCounter("outlet_updated_total", nil)
+	m.RegisterCounter("outlet_deleted_total", nil)
+	m.RegisterCounter("outlet_geofence_updated_total", []string{"enabled"}, []string{"true"}, []string{"false"})
+	m.RegisterCounter("outlet_membership_invited_total", nil)
+	m.RegisterCounter("outlet_membership_accepted_total", nil)
+	m.RegisterCounter("outlet_membership_rejected_total", nil)
+	m.RegisterCounter("outlet_membership_removed_total", nil)
+	m.RegisterCounter("outlet_membership_left_total", nil)
+	m.RegisterCounter("outlet_membership_display_name_updated_total", nil)
 	return &Service{Store: store, Audit: a, Metrics: m}
 }
 
@@ -283,7 +293,7 @@ func (s *Service) CreateOutlet(ctx context.Context, userID uuid.UUID, req Create
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("outlet.created")
+	s.Metrics.Increment("outlet_created_total")
 	s.Audit.Record(ctx, userID.String(), "OUTLET_CREATED", "OUTLET", toUUID(out.ID), map[string]any{"name": out.Name}, ip, userAgent)
 	return toOutletResponse(&out)
 }
@@ -323,7 +333,7 @@ func (s *Service) UpdateOutlet(ctx context.Context, userID, outletID uuid.UUID, 
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("outlet.updated")
+	s.Metrics.Increment("outlet_updated_total")
 	s.Audit.Record(ctx, userID.String(), "OUTLET_UPDATED", "OUTLET", outletID, map[string]any{"name": updated.Name}, ip, userAgent)
 	return toOutletResponse(&updated)
 }
@@ -344,7 +354,7 @@ func (s *Service) UpdateGeofence(ctx context.Context, userID, outletID uuid.UUID
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("outlet.geofence.updated", "enabled", strconv.FormatBool(updated.GeofenceEnabled))
+	s.Metrics.Increment("outlet_geofence_updated_total", "enabled", strconv.FormatBool(updated.GeofenceEnabled))
 	s.Audit.Record(ctx, userID.String(), "OUTLET_GEOFENCE_UPDATED", "OUTLET", outletID, map[string]any{"geofenceEnabled": updated.GeofenceEnabled}, ip, userAgent)
 	return toOutletResponse(&updated)
 }
@@ -366,7 +376,7 @@ func (s *Service) DeleteOutlet(ctx context.Context, userID, outletID uuid.UUID, 
 	}); err != nil {
 		return err
 	}
-	s.Metrics.Increment("outlet.deleted")
+	s.Metrics.Increment("outlet_deleted_total")
 	s.Audit.Record(ctx, userID.String(), "OUTLET_DELETED", "OUTLET", outletID, map[string]any{"name": out.Name}, ip, userAgent)
 	return nil
 }

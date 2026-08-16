@@ -80,3 +80,30 @@ func TestRegisterPoolStats(t *testing.T) {
 		t.Errorf("pool gauges missing: %v", names)
 	}
 }
+
+func TestRegisterCounterExposesZeroBeforeIncrement(t *testing.T) {
+	reg := NewRegistry()
+	reg.RegisterCounter("attendance_created_total", []string{"mode"}, []string{"self"}, []string{"managed"})
+
+	mfs, err := reg.reg.Gather()
+	if err != nil {
+		t.Fatalf("gather: %v", err)
+	}
+	var found *dto.MetricFamily
+	for _, mf := range mfs {
+		if mf.GetName() == "attendance_created_total" {
+			found = mf
+		}
+	}
+	if found == nil {
+		t.Fatal("attendance_created_total not exposed after RegisterCounter")
+	}
+	if len(found.GetMetric()) != 2 {
+		t.Fatalf("expected self+managed series, got %d", len(found.GetMetric()))
+	}
+	for _, m := range found.GetMetric() {
+		if m.GetCounter().GetValue() != 0 {
+			t.Errorf("expected zero-valued pre-registered series, got %v", m)
+		}
+	}
+}

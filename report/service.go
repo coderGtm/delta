@@ -200,6 +200,7 @@ type Service struct {
 
 // NewService returns a Service wired to the given dependencies.
 func NewService(store *db.Store, a *audit.Recorder, m *metrics.Registry) *Service {
+	m.RegisterCounter("report_salary_generated_total", []string{"format"}, []string{"json"}, []string{"xlsx"})
 	return &Service{Store: store, Audit: a, Metrics: m}
 }
 
@@ -279,7 +280,7 @@ func (s *Service) Calculate(ctx context.Context, ownerID, outletID, employeeID u
 		return nil, err
 	}
 	report := buildReport(toUUID(outlet.ID), outlet.Name, &employee, member.DisplayName, start, end, loc, *hourlyRate, entries)
-	s.Metrics.Increment("report.salary.generated", "format", "json")
+	s.Metrics.Increment("report_salary_generated_total", "format", "json")
 	s.Audit.Record(ctx, ownerID.String(), "SALARY_REPORT_GENERATED", "OUTLET", outletID,
 		map[string]any{
 			"employeeUserId": employeeID,

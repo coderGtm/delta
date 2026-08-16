@@ -259,7 +259,7 @@ func assertContains(t *testing.T, got, want string) {
 }
 
 func TestNewServiceDefaultClock(t *testing.T) {
-	svc := NewService(nil, nil, nil, nil)
+	svc := NewService(nil, nil, nil, metrics.NewRegistry())
 	if svc.Clock == nil {
 		t.Error("NewService with a nil clock should fall back to the system clock")
 	}

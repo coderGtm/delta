@@ -232,7 +232,7 @@ func (s *Service) InviteMember(ctx context.Context, ownerID, outletID uuid.UUID,
 		}
 		return nil, err
 	}
-	s.Metrics.Increment("outlet.membership.invited")
+	s.Metrics.Increment("outlet_membership_invited_total")
 	s.Audit.Record(ctx, inviter.ID.String(), "OUTLET_MEMBER_INVITED", "OUTLET_MEMBERSHIP", toUUID(m.ID),
 		map[string]any{"outletId": toUUID(m.OutletID), "inviteeUserId": toUUID(invitee.ID)}, ip, userAgent)
 	row, err := s.loadMembershipDetails(ctx, toUUID(m.ID))
@@ -265,7 +265,7 @@ func (s *Service) AcceptInvite(ctx context.Context, userID, membershipID uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("outlet.membership.accepted")
+	s.Metrics.Increment("outlet_membership_accepted_total")
 	s.Audit.Record(ctx, userID.String(), "OUTLET_INVITE_ACCEPTED", "OUTLET_MEMBERSHIP", membershipID,
 		map[string]any{"outletId": toUUID(m.OutletID)}, ip, userAgent)
 	resp, err := mapMembership(updated, user, outlet, inviter)
@@ -293,7 +293,7 @@ func (s *Service) RejectInvite(ctx context.Context, userID, membershipID uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("outlet.membership.rejected")
+	s.Metrics.Increment("outlet_membership_rejected_total")
 	s.Audit.Record(ctx, userID.String(), "OUTLET_INVITE_REJECTED", "OUTLET_MEMBERSHIP", membershipID,
 		map[string]any{"outletId": toUUID(m.OutletID)}, ip, userAgent)
 	resp, err := mapMembership(updated, user, outlet, inviter)
@@ -329,7 +329,7 @@ func (s *Service) LeaveOutlet(ctx context.Context, userID, outletID uuid.UUID, i
 	}); err != nil {
 		return err
 	}
-	s.Metrics.Increment("outlet.membership.left")
+	s.Metrics.Increment("outlet_membership_left_total")
 	s.Audit.Record(ctx, userID.String(), "OUTLET_MEMBERSHIP_LEFT", "OUTLET_MEMBERSHIP", toUUID(m.ID),
 		map[string]any{"outletId": outletID}, ip, userAgent)
 	return nil
@@ -362,7 +362,7 @@ func (s *Service) RemoveMembership(ctx context.Context, ownerID, outletID, membe
 	}); err != nil {
 		return err
 	}
-	s.Metrics.Increment("outlet.membership.removed")
+	s.Metrics.Increment("outlet_membership_removed_total")
 	s.Audit.Record(ctx, ownerID.String(), "OUTLET_MEMBERSHIP_REMOVED", "OUTLET_MEMBERSHIP", membershipID,
 		map[string]any{"outletId": outletID, "removedUserId": toUUID(m.UserID)}, ip, userAgent)
 	return nil
@@ -393,7 +393,7 @@ func (s *Service) UpdateDisplayName(ctx context.Context, ownerID, outletID, memb
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("outlet.membership.display_name.updated")
+	s.Metrics.Increment("outlet_membership_display_name_updated_total")
 	s.Audit.Record(ctx, ownerID.String(), "OUTLET_MEMBERSHIP_DISPLAY_NAME_UPDATED", "OUTLET_MEMBERSHIP", membershipID,
 		map[string]any{"outletId": outletID, "userId": toUUID(m.UserID), "displayName": displayName}, ip, userAgent)
 	resp, err := mapMembership(updated, user, outlet, inviter)

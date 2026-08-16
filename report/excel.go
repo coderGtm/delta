@@ -20,7 +20,7 @@ func (s *Service) ExportExcel(ctx context.Context, ownerID, outletID, employeeID
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("report.salary.generated", "format", "xlsx")
+	s.Metrics.Increment("report_salary_generated_total", "format", "xlsx")
 	s.Audit.Record(ctx, ownerID.String(), "SALARY_REPORT_EXCEL_GENERATED", "OUTLET", outletID,
 		map[string]any{"employeeUserId": employeeID, "startTime": start.UTC().Format(time.RFC3339Nano), "endTime": end.UTC().Format(time.RFC3339Nano), "timezone": report.Timezone, "format": "xlsx"}, ip, userAgent)
 	return s.BuildExcel(report)

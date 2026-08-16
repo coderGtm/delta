@@ -27,6 +27,11 @@ type Service struct {
 
 // NewService returns a Service wired to the given dependencies.
 func NewService(store *db.Store, fb Firebase, jwt *JWTService, refresh *RefreshTokenService, a *audit.Recorder, m *metrics.Registry) *Service {
+	m.RegisterCounter("auth_login_success_total", nil)
+	m.RegisterCounter("auth_refresh_success_total", nil)
+	m.RegisterCounter("auth_logout_success_total", nil)
+	m.RegisterCounter("auth_logout_all_success_total", nil)
+	m.RegisterCounter("user_deleted_total", nil)
 	return &Service{Store: store, Firebase: fb, JWT: jwt, RefreshSvc: refresh, Audit: a, Metrics: m}
 }
 
@@ -103,7 +108,7 @@ func (s *Service) Login(ctx context.Context, firebaseIDToken, ip, userAgent stri
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("auth.login.success")
+	s.Metrics.Increment("auth_login_success_total")
 	s.Audit.Record(ctx, user.ID.String(), "AUTH_LOGIN", "USER", userID, map[string]any{"email": textOrEmpty(user.Email)}, ip, userAgent)
 	return &LoginResponse{
 		ID:           userID,
@@ -128,7 +133,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken, ip, userAgent strin
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("auth.refresh.success")
+	s.Metrics.Increment("auth_refresh_success_total")
 	s.Audit.Record(ctx, userID.String(), "AUTH_REFRESH", "USER", userID, nil, ip, userAgent)
 	return &RefreshTokenResponse{AccessToken: accessToken, RefreshToken: newRaw}, nil
 }
@@ -138,7 +143,7 @@ func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 	if err := s.RefreshSvc.Revoke(ctx, refreshToken); err != nil {
 		return err
 	}
-	s.Metrics.Increment("auth.logout.success")
+	s.Metrics.Increment("auth_logout_success_total")
 	return nil
 }
 
@@ -147,7 +152,7 @@ func (s *Service) LogoutAll(ctx context.Context, userID uuid.UUID, ip, userAgent
 	if err := s.RefreshSvc.RevokeAllForUser(ctx, userID); err != nil {
 		return err
 	}
-	s.Metrics.Increment("auth.logout_all.success")
+	s.Metrics.Increment("auth_logout_all_success_total")
 	s.Audit.Record(ctx, userID.String(), "AUTH_LOGOUT_ALL", "USER", userID, nil, ip, userAgent)
 	return nil
 }
@@ -169,7 +174,7 @@ func (s *Service) DeleteAccount(ctx context.Context, user *db.User, ip, userAgen
 	if err != nil {
 		return err
 	}
-	s.Metrics.Increment("user.deleted")
+	s.Metrics.Increment("user_deleted_total")
 	s.Audit.Record(ctx, user.ID.String(), "USER_DELETED", "USER", userID, map[string]any{"historicalEmail": textOrEmpty(deleted.HistoricalEmail)}, ip, userAgent)
 	return nil
 }

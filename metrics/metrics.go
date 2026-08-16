@@ -39,16 +39,36 @@ func (r *Registry) Increment(name string, tags ...string) {
 	for i := 0; i < len(tags); i += 2 {
 		labelNames = append(labelNames, tags[i])
 	}
-	key := name + "|" + strings.Join(labelNames, ",")
 	r.mu.Lock()
-	cv, ok := r.counters[key]
-	if !ok {
-		cv = prometheus.NewCounterVec(prometheus.CounterOpts{Name: name, Help: name}, labelNames)
-		r.reg.MustRegister(cv)
-		r.counters[key] = cv
-	}
+	cv := r.registerLocked(name, labelNames)
 	r.mu.Unlock()
 	cv.WithLabelValues(labelValues(tags)...).Inc()
+}
+
+// RegisterCounter eagerly registers the named counter so it is exposed before
+// the first increment. labelNames are the counter's label keys; each valueSets
+// entry is a complete label-value set whose series is created at zero. Pass no
+// value sets for counters with dynamic label values (the vector is registered,
+// series appear on first use). This keeps dashboards populated across
+// restarts. It is safe to call multiple times with the same name and labels.
+func (r *Registry) RegisterCounter(name string, labelNames []string, valueSets ...[]string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cv := r.registerLocked(name, labelNames)
+	for _, vals := range valueSets {
+		cv.WithLabelValues(vals...)
+	}
+}
+
+func (r *Registry) registerLocked(name string, labelNames []string) *prometheus.CounterVec {
+	key := name + "|" + strings.Join(labelNames, ",")
+	if cv, ok := r.counters[key]; ok {
+		return cv
+	}
+	cv := prometheus.NewCounterVec(prometheus.CounterOpts{Name: name, Help: name}, labelNames)
+	r.reg.MustRegister(cv)
+	r.counters[key] = cv
+	return cv
 }
 
 func labelValues(tags []string) []string {

@@ -69,6 +69,10 @@ func NewService(store *db.Store, clock func() time.Time, a *audit.Recorder, m *m
 	if clock == nil {
 		clock = time.Now
 	}
+	m.RegisterCounter("attendance_created_total", []string{"mode"}, []string{"self"}, []string{"managed"})
+	m.RegisterCounter("attendance_updated_total", nil)
+	m.RegisterCounter("attendance_deleted_total", nil)
+	m.RegisterCounter("attendance_geofence_rejected_total", []string{"outletId"})
 	return &Service{Store: store, Clock: clock, Audit: a, Metrics: m}
 }
 
@@ -297,7 +301,7 @@ func (s *Service) enforceGeofence(o *db.Outlet, lat, lon *decimal.Decimal) error
 	}
 	within := IsWithinRadiusMeters(centerLat.Float64(), centerLon.Float64(), lat.Float64(), lon.Float64(), int(o.RadiusMeters))
 	if !within {
-		s.Metrics.Increment("attendance.geofence.rejected", "outletId", o.ID.String())
+		s.Metrics.Increment("attendance_geofence_rejected_total", "outletId", o.ID.String())
 		return httpapi.Forbidden("Attendance location is outside the outlet geofence")
 	}
 	return nil
@@ -399,7 +403,7 @@ func (s *Service) CreateOwn(ctx context.Context, userID, outletID uuid.UUID, req
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("attendance.created", "mode", "self")
+	s.Metrics.Increment("attendance_created_total", "mode", "self")
 	s.Audit.Record(ctx, userID.String(), "ATTENDANCE_CREATED", "ATTENDANCE_ENTRY", toUUID(entry.ID),
 		map[string]any{"outletId": outletID, "userId": userID, "type": entry.Type, "mode": "self"}, ip, userAgent)
 	u, err := s.Store.Querier().GetUserByIDIncludingDeleted(ctx, pgUUID(userID))
@@ -448,7 +452,7 @@ func (s *Service) CreateManaged(ctx context.Context, ownerID, outletID uuid.UUID
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("attendance.created", "mode", "managed")
+	s.Metrics.Increment("attendance_created_total", "mode", "managed")
 	s.Audit.Record(ctx, ownerID.String(), "ATTENDANCE_CREATED", "ATTENDANCE_ENTRY", toUUID(entry.ID),
 		map[string]any{"outletId": outletID, "userId": *req.UserID, "type": entry.Type, "mode": "managed"}, ip, userAgent)
 	u, err := s.Store.Querier().GetUserByIDIncludingDeleted(ctx, pgUUID(*req.UserID))
@@ -529,7 +533,7 @@ func (s *Service) Update(ctx context.Context, ownerID, outletID, entryID uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	s.Metrics.Increment("attendance.updated")
+	s.Metrics.Increment("attendance_updated_total")
 	s.Audit.Record(ctx, ownerID.String(), "ATTENDANCE_UPDATED", "ATTENDANCE_ENTRY", entryID,
 		map[string]any{"outletId": outletID, "userId": toUUID(updated.UserID), "type": updated.Type}, ip, userAgent)
 	u, err := s.Store.Querier().GetUserByIDIncludingDeleted(ctx, pgUUID(toUUID(updated.UserID)))
@@ -568,7 +572,7 @@ func (s *Service) Delete(ctx context.Context, ownerID, outletID, entryID uuid.UU
 	if err := s.Store.Querier().DeleteAttendanceEntry(ctx, pgUUID(entryID)); err != nil {
 		return err
 	}
-	s.Metrics.Increment("attendance.deleted")
+	s.Metrics.Increment("attendance_deleted_total")
 	s.Audit.Record(ctx, ownerID.String(), "ATTENDANCE_DELETED", "ATTENDANCE_ENTRY", entryID,
 		map[string]any{"outletId": outletID, "userId": toUUID(e.UserID), "type": e.Type}, ip, userAgent)
 	return nil

@@ -1,6 +1,7 @@
 package report
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -180,6 +181,19 @@ func TestBuildReport(t *testing.T) {
 	}
 	if len(first.Pairs) != 0 {
 		t.Errorf("day 0 got %d pairs, want 0", len(first.Pairs))
+	}
+	if first.Pairs == nil {
+		t.Error("day 0 Pairs must be a non-nil empty slice so JSON emits [] not null")
+	}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal report: %v", err)
+	}
+	if !bytes.Contains(raw, []byte(`"attendancePairs":[]`)) {
+		t.Errorf("expected attendancePairs:[] in JSON, got %s", raw)
+	}
+	if bytes.Contains(raw, []byte(`"attendancePairs":null`)) {
+		t.Errorf("attendancePairs must not be null: %s", raw)
 	}
 	if got := first.TotalHours.Format(2); got != "0.00" {
 		t.Errorf("day 0 totalHours = %s, want 0.00", got)

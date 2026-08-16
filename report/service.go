@@ -84,7 +84,7 @@ func sum2(vals []decimal.Decimal) decimal.Decimal {
 // CompletedPairs pairs each CLOCK_IN with the next strictly-later CLOCK_OUT.
 // entries must be ordered by entry time ascending.
 func CompletedPairs(entries []db.AttendanceEntry) []Pair {
-	var pairs []Pair
+	pairs := make([]Pair, 0)
 	var pending *db.AttendanceEntry
 	for i := range entries {
 		entry := &entries[i]

@@ -38,6 +38,7 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByIDIncludingDeleted(ctx context.Context, id pgtype.UUID) (User, error)
 	InsertAuditEvent(ctx context.Context, arg InsertAuditEventParams) (AuditEvent, error)
+	ListActiveOwnedOutletsByUser(ctx context.Context, userID pgtype.UUID) ([]ListActiveOwnedOutletsByUserRow, error)
 	ListAttendanceByOutlet(ctx context.Context, arg ListAttendanceByOutletParams) ([]AttendanceEntry, error)
 	ListAttendanceByOutletAndUser(ctx context.Context, arg ListAttendanceByOutletAndUserParams) ([]AttendanceEntry, error)
 	ListAttendanceByOutletUserRange(ctx context.Context, arg ListAttendanceByOutletUserRangeParams) ([]AttendanceEntry, error)

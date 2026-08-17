@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/coderGtm/delta/audit"
@@ -158,10 +159,23 @@ func (s *Service) LogoutAll(ctx context.Context, userID uuid.UUID, ip, userAgent
 }
 
 // DeleteAccount soft-deletes user: it removes the Firebase account, revokes
-// all of the user's refresh tokens, and marks the local row deleted.
+// all of the user's refresh tokens, and marks the local row deleted. The
+// deletion is rejected while the user still owns an active outlet, so no
+// business data can be left orphaned behind a dead owner.
 func (s *Service) DeleteAccount(ctx context.Context, user *db.User, ip, userAgent string) error {
 	if user.DeletedAt.Valid {
 		return httpapi.Conflict("Account has already been deleted")
+	}
+	owned, err := s.Store.Querier().ListActiveOwnedOutletsByUser(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	if len(owned) > 0 {
+		names := make([]string, 0, len(owned))
+		for _, o := range owned {
+			names = append(names, o.Name)
+		}
+		return httpapi.Conflict("Delete your active outlets before deleting your account: " + strings.Join(names, ", "))
 	}
 	if err := s.Firebase.DeleteUser(ctx, user.AuthUid.String); err != nil {
 		return httpapi.Conflict("Failed to delete the user from the authentication provider")

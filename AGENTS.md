@@ -157,6 +157,7 @@ db/migrations
 ### User accounts
 
 - Users can delete their own account via `DELETE /api/v1/users/me`.
+- Account deletion is rejected (409) while the user still owns an active (non-deleted) outlet; the owner must delete their outlets first so no outlet is left orphaned behind a dead owner.
 - Deleting an account removes the Firebase Auth record (`FirebaseService.deleteUser`) so a future sign-in with the same provider email receives a fresh UID, then soft-deletes the local user (`deletedAt`).
 - On deletion the user's email is moved to `historicalEmail` and the active `email` column is cleared, so the unique email constraint does not block a brand-new account using the same email.
 - All active refresh tokens are revoked on deletion.

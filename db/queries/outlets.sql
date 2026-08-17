@@ -103,3 +103,11 @@ LIMIT 1;
 SELECT * FROM outlet_memberships
 WHERE outlet_id = $1 AND user_id = $2
 ORDER BY created_at ASC;
+
+-- name: ListActiveOwnedOutletsByUser :many
+SELECT o.id, o.name
+FROM outlets o
+JOIN outlet_memberships m ON m.outlet_id = o.id
+WHERE m.user_id = $1 AND m.role = 'OWNER' AND m.status = 'ACCEPTED'
+  AND m.removed_at IS NULL AND o.removed_at IS NULL
+ORDER BY o.name;

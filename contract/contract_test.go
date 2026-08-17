@@ -687,6 +687,33 @@ func TestContractEndpoints(t *testing.T) {
 		}
 	})
 
+	t.Run("delete account blocked while owning active outlets", func(t *testing.T) {
+		server, stubFB, _ := buildTestServer(t)
+		client := server.Client()
+		ownerBearer := login(t, client, server.URL, "token-owner")
+
+		status, _, body := doJSON(t, client, http.MethodPost, server.URL+"/api/v1/outlets", ownerBearer,
+			map[string]any{"name": "HQ", "latitude": 40.7128, "longitude": -74.0060, "radiusMeters": 100})
+		assertStatus(t, status, http.StatusCreated)
+		outletID := decodeMap(t, body)["id"].(string)
+
+		status, _, body = doJSON(t, client, http.MethodDelete, server.URL+"/api/v1/users/me", ownerBearer, nil)
+		assertStatus(t, status, http.StatusConflict)
+		assertError(t, body, "CONFLICT", "Delete your active outlets before deleting your account: HQ")
+		if len(stubFB.Deleted) != 0 {
+			t.Errorf("stubFB.Deleted = %v, want no deletions while outlets exist", stubFB.Deleted)
+		}
+
+		status, _, _ = doJSON(t, client, http.MethodDelete, server.URL+"/api/v1/outlets/"+outletID, ownerBearer, nil)
+		assertStatus(t, status, http.StatusNoContent)
+
+		status, _, _ = doJSON(t, client, http.MethodDelete, server.URL+"/api/v1/users/me", ownerBearer, nil)
+		assertStatus(t, status, http.StatusNoContent)
+		if len(stubFB.Deleted) != 1 || stubFB.Deleted[0] != "owner-uid" {
+			t.Errorf("stubFB.Deleted = %v, want [owner-uid]", stubFB.Deleted)
+		}
+	})
+
 	t.Run("unauthenticated", func(t *testing.T) {
 		server, _ := BuildTestServer(t)
 		client := server.Client()

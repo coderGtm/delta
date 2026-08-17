@@ -179,7 +179,8 @@ paths:
       description: |
         Soft-deletes the authenticated user's account: removes the Firebase
         account, revokes every refresh token, and marks the local user row
-        deleted.
+        deleted. Rejected with a conflict while the user still owns an active
+        outlet; the outlets must be deleted first.
       responses:
         '204':
           description: Account deleted.

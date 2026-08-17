@@ -347,6 +347,40 @@ func (q *Queries) GetOutletByIDIncludingDeleted(ctx context.Context, id pgtype.U
 	return i, err
 }
 
+const ListActiveOwnedOutletsByUser = `-- name: ListActiveOwnedOutletsByUser :many
+SELECT o.id, o.name
+FROM outlets o
+JOIN outlet_memberships m ON m.outlet_id = o.id
+WHERE m.user_id = $1 AND m.role = 'OWNER' AND m.status = 'ACCEPTED'
+  AND m.removed_at IS NULL AND o.removed_at IS NULL
+ORDER BY o.name
+`
+
+type ListActiveOwnedOutletsByUserRow struct {
+	ID   pgtype.UUID
+	Name string
+}
+
+func (q *Queries) ListActiveOwnedOutletsByUser(ctx context.Context, userID pgtype.UUID) ([]ListActiveOwnedOutletsByUserRow, error) {
+	rows, err := q.db.Query(ctx, ListActiveOwnedOutletsByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListActiveOwnedOutletsByUserRow{}
+	for rows.Next() {
+		var i ListActiveOwnedOutletsByUserRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const ListMembershipsForOutlet = `-- name: ListMembershipsForOutlet :many
 SELECT m.id, m.outlet_id, m.user_id, m.role, m.status, m.display_name, m.invited_by_user_id, m.removed_at, m.removed_by_user_id, m.created_at, m.updated_at, u.id AS user_id, u.name AS user_name, u.email AS user_email,
        iu.id AS invited_by_user_id, iu.name AS invited_by_user_name

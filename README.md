@@ -8,14 +8,14 @@ It provides a versioned HTTP API under `/api/v1`, PostgreSQL persistence, Fireba
 
 ```mermaid
 flowchart LR
-    Client[Mobile or web client] --> API[Go HTTP API]
-    API --> Auth[Auth middleware]
-    Auth --> Services[Domain services]
-    Services --> Store[pgx + SQLC]
-    Store --> PostgreSQL[(PostgreSQL)]
-    Services --> Firebase[Firebase Admin SDK]
-    Prometheus[Prometheus] --> Metrics[/metrics]
-    Grafana[Grafana] --> Prometheus
+    Client["Mobile or web client"] --> API["Go HTTP API"]
+    API --> Auth["Auth middleware"]
+    Auth --> Services["Domain services"]
+    Services --> Store["pgx + SQLC"]
+    Store --> PostgreSQL[("PostgreSQL")]
+    Services --> Firebase["Firebase Admin SDK"]
+    Prometheus["Prometheus"] --> Metrics["/metrics"]
+    Grafana["Grafana"] --> Prometheus
 ```
 
 Handlers are intentionally thin. Domain behavior lives in services, persistence is isolated in `db`, and SQL is generated from the hand-written queries in `db/queries`.

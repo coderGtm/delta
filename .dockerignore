@@ -1,12 +1,9 @@
 .git
-.gradle
-build
-bin
-.vscode
-HELP.md
-*.log
 .env
 .env.*
 !.env.example
 firebase/service-account.json
 monitoring/prometheus/prometheus-token.txt
+.superpowers
+docs
+loadtest

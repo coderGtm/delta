@@ -19,25 +19,24 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
     container_name: delta-app
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-delta}
-      DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-delta}
       JWT_SECRET: ${JWT_SECRET:-replace-this-with-a-long-random-production-secret-at-least-32-bytes}
       PROMETHEUS_BEARER_TOKEN: ${PROMETHEUS_BEARER_TOKEN:-replace-this-with-a-long-random-monitoring-token}
       FIREBASE_SERVICE_ACCOUNT_PATH: /app/firebase/service-account.json
-      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
+      PORT: "8080"
+      AUTO_MIGRATE: "true"
     ports:
       - "8080:8080"
     volumes:
       - ./firebase:/app/firebase:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/readyz || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10

@@ -1,88 +1,196 @@
-# delta — Go backend
+# Delta
 
-Go implementation of the `delta` employee attendance backend: Firebase login, local JWT auth, outlet memberships, attendance/geofencing, salary reports, golang-migrate migrations, and Prometheus metrics.
+Delta is a Go backend for employee attendance, outlet memberships, geofenced clock-in/out, and salary reporting.
 
-## Quickstart
+It provides a versioned HTTP API under `/api/v1`, PostgreSQL persistence, Firebase ID-token verification, local JWT access and refresh tokens, Prometheus metrics, Swagger UI, and Excel salary exports.
 
-Prerequisites: Go 1.25+, Docker (or rootless Podman), `make`, and PostgreSQL if running outside Docker.
+## Architecture
 
-Copy the example env file and edit it (a `JWT_SECRET` is required):
+```mermaid
+flowchart LR
+    Client[Mobile or web client] --> API[Go HTTP API]
+    API --> Auth[Auth middleware]
+    Auth --> Services[Domain services]
+    Services --> Store[pgx + SQLC]
+    Store --> PostgreSQL[(PostgreSQL)]
+    Services --> Firebase[Firebase Admin SDK]
+    Prometheus[Prometheus] --> Metrics[/metrics]
+    Grafana[Grafana] --> Prometheus
+```
+
+Handlers are intentionally thin. Domain behavior lives in services, persistence is isolated in `db`, and SQL is generated from the hand-written queries in `db/queries`.
+
+## Features
+
+- Firebase ID-token login with local JWT access and refresh tokens
+- Refresh-token rotation, revocation, logout, and account deletion
+- Outlet creation, updates, soft deletion, and owner-controlled memberships
+- Employee invitations, acceptance, rejection, leaving, removal, and display names
+- Employee and owner-managed attendance entries
+- Outlet geofencing with haversine distance checks
+- Exact decimal handling for coordinates, hours, and salary calculations
+- Timezone-aware daily salary reports with Excel export
+- In-memory fixed-window rate limiting for authentication and write-heavy routes
+- Prometheus business, HTTP, runtime, process, and database-pool metrics
+- Embedded OpenAPI specification and Swagger UI
+
+## Quick Start
+
+### Requirements
+
+- Go 1.25+
+- PostgreSQL 17+ or Docker/Podman
+- `make`
+- Firebase service-account JSON for real Firebase login flows
+
+### Run Locally
 
 ```bash
 cp .env.example .env
-```
-
-All configuration comes from environment variables; see `SETUP.md` for the full table and `config/config.go` for the source of truth.
-
-Run the service locally (applies migrations when `AUTO_MIGRATE=true`):
-
-```bash
+# Set JWT_SECRET and Firebase settings in .env.
 make run
 ```
 
-Build, test, and lint:
+With `AUTO_MIGRATE=true`, the service applies embedded migrations on startup.
 
-```bash
-make build
-make test
-make lint
-```
-
-Integration and contract tests use [testcontainers-go](https://golang.testcontainers.org) and need a container runtime. Under rootless Podman, set `TESTCONTAINERS_RYUK_DISABLED=true` and `DOCKER_HOST=unix:///run/user/<uid>/podman/podman.sock`.
-
-Run the full stack with Docker Compose from the repository root:
+### Run With Compose
 
 ```bash
 cp .env.example .env
-# edit .env and provide firebase/service-account.json
-
+# Place firebase/service-account.json for real Firebase authentication.
 docker compose up --build
 ```
 
-## Package map
+The app is available at `http://localhost:8080`.
 
-| Package | Purpose |
-| --- | --- |
-| `cmd/delta` | Entrypoint; wiring only, no business logic |
-| `config` | Environment-based configuration |
-| `httpapi` | Router, middleware, error/response envelopes, pagination, rate limiting, /docs |
-| `db` | pgx pool, sqlc-generated queries, embedded golang-migrate migrations |
-| `auth` | Firebase verify/delete, JWT, refresh tokens, middleware, handlers |
-| `user` | Account deletion |
-| `outlet` | Outlets + memberships domain and handlers |
-| `attendance` | Attendance + geofence and handlers |
-| `report` | Salary reports + Excel export and handlers |
-| `audit` | Best-effort audit event recording |
-| `metrics` | Prometheus business counter registry |
-| `decimal` | Exact decimal arithmetic |
-| `contract` | Testcontainers infrastructure + contract tests |
+## Configuration
 
-See `STRUCTURE.md` for the full tree.
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `8080` | HTTP listen port |
+| `DATABASE_URL` | local PostgreSQL URL | PostgreSQL connection URL |
+| `AUTO_MIGRATE` | `true` | Apply migrations during startup |
+| `JWT_SECRET` | required | Secret used to sign local tokens |
+| `JWT_ACCESS_TOKEN_TTL` | `900000` | Access-token lifetime in milliseconds |
+| `JWT_REFRESH_TOKEN_TTL` | `2592000000` | Refresh-token lifetime in milliseconds |
+| `JWT_REFRESH_CLEANUP_INTERVAL` | `86400000` | Refresh-token cleanup interval in milliseconds |
+| `JWT_REFRESH_REVOKED_RETENTION` | `604800000` | Revoked-token retention in milliseconds |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | `firebase/service-account.json` | Firebase service-account file |
+| `PROMETHEUS_BEARER_TOKEN` | empty | Optional bearer token for `/metrics` |
+| `TRUST_PROXY_HEADERS` | `true` | Trust forwarded client-IP headers |
+| `LOG_LEVEL` | `info` | Log level |
+| `LOG_FORMAT` | `text` | `text` or `json` |
 
-## Ops endpoints
+See `.env.example` for a complete local configuration.
 
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /healthz` | Liveness; always `200 {"status":"UP"}` when serving |
-| `GET /readyz` | Readiness; pings the database |
-| `GET /metrics` | Prometheus metrics; bearer-gated when `PROMETHEUS_BEARER_TOKEN` is set |
-| `GET /docs` | Swagger UI over the hand-maintained spec |
-| `GET /docs/openapi.yaml` | The OpenAPI spec |
+## API And Operations
 
-The client-facing API lives under `/api/v1` (e.g. `/api/v1/auth/login`, `/api/v1/outlets`).
+| Endpoint | Purpose | Authentication |
+| --- | --- | --- |
+| `GET /healthz` | Liveness check | Public |
+| `GET /readyz` | Database readiness check | Public |
+| `GET /metrics` | Prometheus metrics | Bearer token when configured |
+| `GET /docs/` | Swagger UI | Public |
+| `GET /docs/openapi.yaml` | OpenAPI 3 specification | Public |
+| `/api/v1/auth/*` | Login and token lifecycle | See OpenAPI spec |
+| `/api/v1/outlets/*` | Outlet, membership, attendance, and report APIs | Mostly protected |
 
-## Verification (2026-08-15)
+The OpenAPI document is the API contract. Browse it at `/docs/openapi.yaml` or use the interactive UI at `/docs/`.
 
-Final verification against the `go-rewrite` branch:
+## Development
 
-- Gates: `go build ./...`, `go vet ./...`, `go test -count=1 ./...`, `gofmt -l .` all clean; no `java|spring|jpa` matches in Go sources.
-- Stack: `docker compose up --build -d postgres app` via rootless podman (`DOCKER_HOST=unix:///run/user/1000/podman/podman.sock`); `/healthz`, `/readyz`, `/docs/`, `/docs/openapi.yaml` all up.
-- k6: `smoke.js` PASS (10/10 checks, p95 11.9ms), `capacity.js` PASS (273,597 reqs @ ~1,300 rps, 0% failed, p95 53ms), `rate-limit.js` PASS (98/98 checks; 429 + `Retry-After` at every budget).
-- Metrics: `auth_login_success_total`, `outlet_created_total`, `attendance_created_total`, `outlet_membership_*_total`, `attendance_updated_total`/`attendance_deleted_total`/`attendance_geofence_rejected_total`, `report_salary_generated_total`, `user_deleted_total`, plus HTTP `http_requests_total` / `http_request_duration_seconds` and DB `delta_db_connections_total` / `delta_db_connections_idle`.
+```bash
+make build       # Build cmd/delta
+make test        # Run all tests
+make lint        # Run go vet and gofmt check
+make vet         # Run go vet
+make fmt         # Format Go sources
+make run         # Run the API locally
+```
 
-## Links
+After editing a SQL query:
 
-- `SETUP.md` — setup, configuration, monitoring, report usage.
-- `STRUCTURE.md` — package layout and sqlc workflow.
-- `AGENTS.md` — coding-agent/project guidance.
-- `docs/superpowers/specs/2026-08-14-delta-go-rewrite-design.md` — the rewrite design spec.
+```bash
+cd db && sqlc generate
+```
+
+Do not edit SQLC-generated files directly. Add schema changes as a new migration in `db/migrations`.
+
+## Testing
+
+The suite includes:
+
+- Unit tests for decimal arithmetic, validation, geofencing, pagination, and middleware
+- Service integration tests against PostgreSQL
+- HTTP contract tests covering authentication, authorization, response shapes, and error behavior
+- Excel export tests
+
+Run the full suite:
+
+```bash
+make test
+```
+
+Integration tests use Testcontainers. Docker or rootless Podman is required to run them instead of skipping them. For rootless Podman:
+
+```bash
+export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
+export TESTCONTAINERS_RYUK_DISABLED=true
+make test
+```
+
+## Observability
+
+The Prometheus registry exposes:
+
+- HTTP request totals and duration histograms
+- Authentication, outlet, membership, attendance, report, and account counters
+- Go runtime and process metrics
+- PostgreSQL pool totals and idle connections
+
+Grafana provisioning is under `monitoring/grafana`. The dashboard is designed around the Go metric names and reloads from disk periodically.
+
+For local load testing:
+
+```bash
+./loadtest/seed.sh
+docker run --rm -i -e BASE_URL=http://localhost:8080 grafana/k6 run - < loadtest/smoke.js
+docker run --rm -i -e BASE_URL=http://localhost:8080 grafana/k6 run - < loadtest/capacity.js
+docker run --rm -i -e BASE_URL=http://localhost:8080 grafana/k6 run - < loadtest/rate-limit.js
+```
+
+The load tests mint local JWTs using the configured `JWT_SECRET`; Firebase credentials are not required for them.
+
+## Project Layout
+
+```text
+cmd/delta/      Application entrypoint and dependency wiring
+config/         Environment configuration
+db/             PostgreSQL pool, migrations, SQLC models and queries
+httpapi/        Router, middleware, pagination, errors, docs, rate limiting
+auth/           Firebase, JWT, refresh tokens, auth handlers
+user/           Account deletion
+outlet/         Outlets and memberships
+attendance/     Attendance entries and geofencing
+report/         Salary reports and Excel export
+decimal/        Exact arbitrary-precision decimal values
+audit/          Best-effort business audit events
+metrics/        Prometheus registry and instrumentation
+contract/       HTTP contract and database integration tests
+monitoring/     Prometheus and Grafana configuration
+loadtest/       k6 scripts and deterministic seed data
+```
+
+More detail is available in [`STRUCTURE.md`](STRUCTURE.md). Setup and deployment instructions are in [`SETUP.md`](SETUP.md), and repository conventions are documented in [`AGENTS.md`](AGENTS.md).
+
+## Security Notes
+
+- Keep `JWT_SECRET`, Firebase credentials, Prometheus tokens, and database credentials out of Git.
+- Set `TRUST_PROXY_HEADERS=true` only when a trusted proxy overwrites forwarded headers.
+- Keep `/metrics` private to monitoring infrastructure.
+- Account deletion is blocked while the user owns active outlets; delete or transfer those outlets first.
+- Outlets, memberships, and attendance use soft-deletion rules where historical reporting requires preservation.
+
+## License
+
+No license has been declared yet.

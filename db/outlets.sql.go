@@ -85,7 +85,7 @@ func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipPara
 const CreateOutlet = `-- name: CreateOutlet :one
 INSERT INTO outlets (name, latitude, longitude, radius_meters)
 VALUES ($1, $2, $3, $4)
-RETURNING id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at
+RETURNING id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at, show_recent_entries_to_employees, show_total_time_today_to_employees
 `
 
 type CreateOutletParams struct {
@@ -114,13 +114,15 @@ func (q *Queries) CreateOutlet(ctx context.Context, arg CreateOutletParams) (Out
 		&i.RemovedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ShowRecentEntriesToEmployees,
+		&i.ShowTotalTimeTodayToEmployees,
 	)
 	return i, err
 }
 
 const DeleteOutlet = `-- name: DeleteOutlet :one
 UPDATE outlets SET removed_at = now(), removed_by_user_id = $2, updated_at = now()
-WHERE id = $1 RETURNING id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at
+WHERE id = $1 RETURNING id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at, show_recent_entries_to_employees, show_total_time_today_to_employees
 `
 
 type DeleteOutletParams struct {
@@ -142,6 +144,8 @@ func (q *Queries) DeleteOutlet(ctx context.Context, arg DeleteOutletParams) (Out
 		&i.RemovedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ShowRecentEntriesToEmployees,
+		&i.ShowTotalTimeTodayToEmployees,
 	)
 	return i, err
 }
@@ -231,7 +235,8 @@ const GetMembershipDetailsByID = `-- name: GetMembershipDetailsByID :one
 SELECT m.id, m.outlet_id, m.user_id, m.role, m.status, m.display_name, m.invited_by_user_id, m.removed_at, m.removed_by_user_id, m.created_at, m.updated_at,
        u.id AS user_id, u.name AS user_name, u.email AS user_email,
        o.id AS outlet_id, o.name AS outlet_name, o.latitude, o.longitude, o.radius_meters,
-       o.geofence_enabled, o.removed_at AS outlet_removed_at, o.created_at AS outlet_created_at,
+       o.geofence_enabled, o.show_recent_entries_to_employees, o.show_total_time_today_to_employees,
+       o.removed_at AS outlet_removed_at, o.created_at AS outlet_created_at,
        o.updated_at AS outlet_updated_at,
        iu.id AS invited_by_user_id, iu.name AS invited_by_user_name
 FROM outlet_memberships m
@@ -243,31 +248,33 @@ LIMIT 1
 `
 
 type GetMembershipDetailsByIDRow struct {
-	ID                pgtype.UUID
-	OutletID          pgtype.UUID
-	UserID            pgtype.UUID
-	Role              string
-	Status            string
-	DisplayName       string
-	InvitedByUserID   pgtype.UUID
-	RemovedAt         pgtype.Timestamptz
-	RemovedByUserID   pgtype.UUID
-	CreatedAt         pgtype.Timestamptz
-	UpdatedAt         pgtype.Timestamptz
-	UserID_2          pgtype.UUID
-	UserName          string
-	UserEmail         pgtype.Text
-	OutletID_2        pgtype.UUID
-	OutletName        string
-	Latitude          pgtype.Numeric
-	Longitude         pgtype.Numeric
-	RadiusMeters      int32
-	GeofenceEnabled   bool
-	OutletRemovedAt   pgtype.Timestamptz
-	OutletCreatedAt   pgtype.Timestamptz
-	OutletUpdatedAt   pgtype.Timestamptz
-	InvitedByUserID_2 pgtype.UUID
-	InvitedByUserName pgtype.Text
+	ID                            pgtype.UUID
+	OutletID                      pgtype.UUID
+	UserID                        pgtype.UUID
+	Role                          string
+	Status                        string
+	DisplayName                   string
+	InvitedByUserID               pgtype.UUID
+	RemovedAt                     pgtype.Timestamptz
+	RemovedByUserID               pgtype.UUID
+	CreatedAt                     pgtype.Timestamptz
+	UpdatedAt                     pgtype.Timestamptz
+	UserID_2                      pgtype.UUID
+	UserName                      string
+	UserEmail                     pgtype.Text
+	OutletID_2                    pgtype.UUID
+	OutletName                    string
+	Latitude                      pgtype.Numeric
+	Longitude                     pgtype.Numeric
+	RadiusMeters                  int32
+	GeofenceEnabled               bool
+	ShowRecentEntriesToEmployees  bool
+	ShowTotalTimeTodayToEmployees bool
+	OutletRemovedAt               pgtype.Timestamptz
+	OutletCreatedAt               pgtype.Timestamptz
+	OutletUpdatedAt               pgtype.Timestamptz
+	InvitedByUserID_2             pgtype.UUID
+	InvitedByUserName             pgtype.Text
 }
 
 func (q *Queries) GetMembershipDetailsByID(ctx context.Context, id pgtype.UUID) (GetMembershipDetailsByIDRow, error) {
@@ -294,6 +301,8 @@ func (q *Queries) GetMembershipDetailsByID(ctx context.Context, id pgtype.UUID) 
 		&i.Longitude,
 		&i.RadiusMeters,
 		&i.GeofenceEnabled,
+		&i.ShowRecentEntriesToEmployees,
+		&i.ShowTotalTimeTodayToEmployees,
 		&i.OutletRemovedAt,
 		&i.OutletCreatedAt,
 		&i.OutletUpdatedAt,
@@ -304,7 +313,7 @@ func (q *Queries) GetMembershipDetailsByID(ctx context.Context, id pgtype.UUID) 
 }
 
 const GetOutletByID = `-- name: GetOutletByID :one
-SELECT id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at FROM outlets WHERE id = $1 AND removed_at IS NULL LIMIT 1
+SELECT id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at, show_recent_entries_to_employees, show_total_time_today_to_employees FROM outlets WHERE id = $1 AND removed_at IS NULL LIMIT 1
 `
 
 func (q *Queries) GetOutletByID(ctx context.Context, id pgtype.UUID) (Outlet, error) {
@@ -321,12 +330,14 @@ func (q *Queries) GetOutletByID(ctx context.Context, id pgtype.UUID) (Outlet, er
 		&i.RemovedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ShowRecentEntriesToEmployees,
+		&i.ShowTotalTimeTodayToEmployees,
 	)
 	return i, err
 }
 
 const GetOutletByIDIncludingDeleted = `-- name: GetOutletByIDIncludingDeleted :one
-SELECT id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at FROM outlets WHERE id = $1 LIMIT 1
+SELECT id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at, show_recent_entries_to_employees, show_total_time_today_to_employees FROM outlets WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetOutletByIDIncludingDeleted(ctx context.Context, id pgtype.UUID) (Outlet, error) {
@@ -343,6 +354,8 @@ func (q *Queries) GetOutletByIDIncludingDeleted(ctx context.Context, id pgtype.U
 		&i.RemovedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ShowRecentEntriesToEmployees,
+		&i.ShowTotalTimeTodayToEmployees,
 	)
 	return i, err
 }
@@ -499,7 +512,8 @@ func (q *Queries) ListMembershipsForOutletByUser(ctx context.Context, arg ListMe
 
 const ListMembershipsForUserByStatus = `-- name: ListMembershipsForUserByStatus :many
 SELECT m.id, m.outlet_id, m.user_id, m.role, m.status, m.display_name, m.invited_by_user_id, m.removed_at, m.removed_by_user_id, m.created_at, m.updated_at, o.id AS outlet_id, o.name AS outlet_name, o.latitude, o.longitude, o.radius_meters,
-       o.geofence_enabled, o.removed_at AS outlet_removed_at, o.created_at AS outlet_created_at,
+       o.geofence_enabled, o.show_recent_entries_to_employees, o.show_total_time_today_to_employees,
+       o.removed_at AS outlet_removed_at, o.created_at AS outlet_created_at,
        o.updated_at AS outlet_updated_at
 FROM outlet_memberships m
 JOIN outlets o ON o.id = m.outlet_id
@@ -516,26 +530,28 @@ type ListMembershipsForUserByStatusParams struct {
 }
 
 type ListMembershipsForUserByStatusRow struct {
-	ID              pgtype.UUID
-	OutletID        pgtype.UUID
-	UserID          pgtype.UUID
-	Role            string
-	Status          string
-	DisplayName     string
-	InvitedByUserID pgtype.UUID
-	RemovedAt       pgtype.Timestamptz
-	RemovedByUserID pgtype.UUID
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
-	OutletID_2      pgtype.UUID
-	OutletName      string
-	Latitude        pgtype.Numeric
-	Longitude       pgtype.Numeric
-	RadiusMeters    int32
-	GeofenceEnabled bool
-	OutletRemovedAt pgtype.Timestamptz
-	OutletCreatedAt pgtype.Timestamptz
-	OutletUpdatedAt pgtype.Timestamptz
+	ID                            pgtype.UUID
+	OutletID                      pgtype.UUID
+	UserID                        pgtype.UUID
+	Role                          string
+	Status                        string
+	DisplayName                   string
+	InvitedByUserID               pgtype.UUID
+	RemovedAt                     pgtype.Timestamptz
+	RemovedByUserID               pgtype.UUID
+	CreatedAt                     pgtype.Timestamptz
+	UpdatedAt                     pgtype.Timestamptz
+	OutletID_2                    pgtype.UUID
+	OutletName                    string
+	Latitude                      pgtype.Numeric
+	Longitude                     pgtype.Numeric
+	RadiusMeters                  int32
+	GeofenceEnabled               bool
+	ShowRecentEntriesToEmployees  bool
+	ShowTotalTimeTodayToEmployees bool
+	OutletRemovedAt               pgtype.Timestamptz
+	OutletCreatedAt               pgtype.Timestamptz
+	OutletUpdatedAt               pgtype.Timestamptz
 }
 
 func (q *Queries) ListMembershipsForUserByStatus(ctx context.Context, arg ListMembershipsForUserByStatusParams) ([]ListMembershipsForUserByStatusRow, error) {
@@ -570,6 +586,8 @@ func (q *Queries) ListMembershipsForUserByStatus(ctx context.Context, arg ListMe
 			&i.Longitude,
 			&i.RadiusMeters,
 			&i.GeofenceEnabled,
+			&i.ShowRecentEntriesToEmployees,
+			&i.ShowTotalTimeTodayToEmployees,
 			&i.OutletRemovedAt,
 			&i.OutletCreatedAt,
 			&i.OutletUpdatedAt,
@@ -713,7 +731,7 @@ const UpdateOutlet = `-- name: UpdateOutlet :one
 UPDATE outlets
 SET name = $2, latitude = $3, longitude = $4, radius_meters = $5, updated_at = now()
 WHERE id = $1
-RETURNING id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at
+RETURNING id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at, show_recent_entries_to_employees, show_total_time_today_to_employees
 `
 
 type UpdateOutletParams struct {
@@ -744,12 +762,14 @@ func (q *Queries) UpdateOutlet(ctx context.Context, arg UpdateOutletParams) (Out
 		&i.RemovedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ShowRecentEntriesToEmployees,
+		&i.ShowTotalTimeTodayToEmployees,
 	)
 	return i, err
 }
 
 const UpdateOutletGeofence = `-- name: UpdateOutletGeofence :one
-UPDATE outlets SET geofence_enabled = $2, updated_at = now() WHERE id = $1 RETURNING id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at
+UPDATE outlets SET geofence_enabled = $2, updated_at = now() WHERE id = $1 RETURNING id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at, show_recent_entries_to_employees, show_total_time_today_to_employees
 `
 
 type UpdateOutletGeofenceParams struct {
@@ -771,6 +791,66 @@ func (q *Queries) UpdateOutletGeofence(ctx context.Context, arg UpdateOutletGeof
 		&i.RemovedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ShowRecentEntriesToEmployees,
+		&i.ShowTotalTimeTodayToEmployees,
+	)
+	return i, err
+}
+
+const UpdateOutletRecentEntriesVisibility = `-- name: UpdateOutletRecentEntriesVisibility :one
+UPDATE outlets SET show_recent_entries_to_employees = $2, updated_at = now() WHERE id = $1 RETURNING id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at, show_recent_entries_to_employees, show_total_time_today_to_employees
+`
+
+type UpdateOutletRecentEntriesVisibilityParams struct {
+	ID                           pgtype.UUID
+	ShowRecentEntriesToEmployees bool
+}
+
+func (q *Queries) UpdateOutletRecentEntriesVisibility(ctx context.Context, arg UpdateOutletRecentEntriesVisibilityParams) (Outlet, error) {
+	row := q.db.QueryRow(ctx, UpdateOutletRecentEntriesVisibility, arg.ID, arg.ShowRecentEntriesToEmployees)
+	var i Outlet
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Latitude,
+		&i.Longitude,
+		&i.RadiusMeters,
+		&i.GeofenceEnabled,
+		&i.RemovedAt,
+		&i.RemovedByUserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ShowRecentEntriesToEmployees,
+		&i.ShowTotalTimeTodayToEmployees,
+	)
+	return i, err
+}
+
+const UpdateOutletTotalTimeTodayVisibility = `-- name: UpdateOutletTotalTimeTodayVisibility :one
+UPDATE outlets SET show_total_time_today_to_employees = $2, updated_at = now() WHERE id = $1 RETURNING id, name, latitude, longitude, radius_meters, geofence_enabled, removed_at, removed_by_user_id, created_at, updated_at, show_recent_entries_to_employees, show_total_time_today_to_employees
+`
+
+type UpdateOutletTotalTimeTodayVisibilityParams struct {
+	ID                            pgtype.UUID
+	ShowTotalTimeTodayToEmployees bool
+}
+
+func (q *Queries) UpdateOutletTotalTimeTodayVisibility(ctx context.Context, arg UpdateOutletTotalTimeTodayVisibilityParams) (Outlet, error) {
+	row := q.db.QueryRow(ctx, UpdateOutletTotalTimeTodayVisibility, arg.ID, arg.ShowTotalTimeTodayToEmployees)
+	var i Outlet
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Latitude,
+		&i.Longitude,
+		&i.RadiusMeters,
+		&i.GeofenceEnabled,
+		&i.RemovedAt,
+		&i.RemovedByUserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ShowRecentEntriesToEmployees,
+		&i.ShowTotalTimeTodayToEmployees,
 	)
 	return i, err
 }

@@ -22,6 +22,20 @@ type updateGeofenceRequest struct {
 	GeofenceEnabled *bool `json:"geofenceEnabled"`
 }
 
+// updateRecentEntriesVisibilityRequest is the body of PUT
+// /api/v1/outlets/{outletId}/recent-entries-visibility. The pointer
+// distinguishes a missing flag from an explicit false.
+type updateRecentEntriesVisibilityRequest struct {
+	ShowRecentEntriesToEmployees *bool `json:"showRecentEntriesToEmployees"`
+}
+
+// updateTotalTimeTodayVisibilityRequest is the body of PUT
+// /api/v1/outlets/{outletId}/total-time-today-visibility. The pointer
+// distinguishes a missing flag from an explicit false.
+type updateTotalTimeTodayVisibilityRequest struct {
+	ShowTotalTimeTodayToEmployees *bool `json:"showTotalTimeTodayToEmployees"`
+}
+
 // inviteMemberRequest is the body of POST /api/v1/outlets/{outletId}/memberships/invite.
 type inviteMemberRequest struct {
 	Email string `json:"email"`
@@ -156,6 +170,70 @@ func (h *Handlers) UpdateGeofence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, err := h.Svc.UpdateGeofence(r.Context(), userID, outletID, *req.GeofenceEnabled, httpapi.ClientIP(r, h.TrustProxy), r.Header.Get("User-Agent"))
+	if err != nil {
+		httpapi.WriteError(w, err)
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, out)
+}
+
+// UpdateRecentEntriesVisibility handles PUT
+// /api/v1/outlets/{outletId}/recent-entries-visibility, controlling whether
+// employees see their recent attendance entries. Only accepted outlet owners
+// may perform this action.
+func (h *Handlers) UpdateRecentEntriesVisibility(w http.ResponseWriter, r *http.Request) {
+	userID, err := h.currentUserID(r)
+	if err != nil {
+		httpapi.WriteError(w, httpapi.Internal("authenticated user missing"))
+		return
+	}
+	outletID, err := pathOutletID(r)
+	if err != nil {
+		httpapi.WriteError(w, err)
+		return
+	}
+	var req updateRecentEntriesVisibilityRequest
+	if err := httpapi.DecodeJSON(r, &req); err != nil {
+		httpapi.WriteError(w, err)
+		return
+	}
+	if req.ShowRecentEntriesToEmployees == nil {
+		httpapi.WriteError(w, httpapi.Validation("Recent entries visibility flag is required"))
+		return
+	}
+	out, err := h.Svc.UpdateRecentEntriesVisibility(r.Context(), userID, outletID, *req.ShowRecentEntriesToEmployees, httpapi.ClientIP(r, h.TrustProxy), r.Header.Get("User-Agent"))
+	if err != nil {
+		httpapi.WriteError(w, err)
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, out)
+}
+
+// UpdateTotalTimeTodayVisibility handles PUT
+// /api/v1/outlets/{outletId}/total-time-today-visibility, controlling whether
+// employees see their total time logged today. Only accepted outlet owners may
+// perform this action.
+func (h *Handlers) UpdateTotalTimeTodayVisibility(w http.ResponseWriter, r *http.Request) {
+	userID, err := h.currentUserID(r)
+	if err != nil {
+		httpapi.WriteError(w, httpapi.Internal("authenticated user missing"))
+		return
+	}
+	outletID, err := pathOutletID(r)
+	if err != nil {
+		httpapi.WriteError(w, err)
+		return
+	}
+	var req updateTotalTimeTodayVisibilityRequest
+	if err := httpapi.DecodeJSON(r, &req); err != nil {
+		httpapi.WriteError(w, err)
+		return
+	}
+	if req.ShowTotalTimeTodayToEmployees == nil {
+		httpapi.WriteError(w, httpapi.Validation("Total time today visibility flag is required"))
+		return
+	}
+	out, err := h.Svc.UpdateTotalTimeTodayVisibility(r.Context(), userID, outletID, *req.ShowTotalTimeTodayToEmployees, httpapi.ClientIP(r, h.TrustProxy), r.Header.Get("User-Agent"))
 	if err != nil {
 		httpapi.WriteError(w, err)
 		return

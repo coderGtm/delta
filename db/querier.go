@@ -53,6 +53,8 @@ type Querier interface {
 	UpdateMembershipStatus(ctx context.Context, arg UpdateMembershipStatusParams) (OutletMembership, error)
 	UpdateOutlet(ctx context.Context, arg UpdateOutletParams) (Outlet, error)
 	UpdateOutletGeofence(ctx context.Context, arg UpdateOutletGeofenceParams) (Outlet, error)
+	UpdateOutletRecentEntriesVisibility(ctx context.Context, arg UpdateOutletRecentEntriesVisibilityParams) (Outlet, error)
+	UpdateOutletTotalTimeTodayVisibility(ctx context.Context, arg UpdateOutletTotalTimeTodayVisibilityParams) (Outlet, error)
 	UpdateRefreshTokenRevoked(ctx context.Context, arg UpdateRefreshTokenRevokedParams) (RefreshToken, error)
 }
 

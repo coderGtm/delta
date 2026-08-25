@@ -204,3 +204,90 @@ func TestMembershipLifecycle(t *testing.T) {
 		t.Errorf("historical report = %s hours, display name %q; want 8.00 / Nick", rep.TotalHours.Format(2), rep.DisplayName)
 	}
 }
+
+// TestEmployeeVisibilitySettings verifies that the outlet visibility settings
+// default to false, are owner-only toggles, and are surfaced on both the
+// direct outlet read and the user-facing membership listings so the mobile
+// client can honor them without a dedicated read endpoint.
+func TestEmployeeVisibilitySettings(t *testing.T) {
+	store := contract.Setup(t)
+	ctx := context.Background()
+	registry := metrics.NewRegistry()
+	recorder := audit.NewRecorder(store)
+	outletSvc := outlet.NewService(store, recorder, registry)
+
+	ownerID := createUser(t, store, "owner-uid", "Owner User", "owner@example.com")
+	empID := createUser(t, store, "emp-uid", "Employee User", "employee@example.com")
+
+	out, err := outletSvc.CreateOutlet(ctx, ownerID, outlet.CreateOutletRequest{
+		Name:         "HQ",
+		Latitude:     mustDec(t, "40.7128"),
+		Longitude:    mustDec(t, "-74.0060"),
+		RadiusMeters: intPtr(100),
+	}, "127.0.0.1", "test")
+	if err != nil {
+		t.Fatalf("create outlet: %v", err)
+	}
+	outletID := out.ID
+	if out.ShowRecentEntriesToEmployees || out.ShowTotalTimeTodayToEmployees {
+		t.Fatalf("created outlet visibility = %+v, want both false", out)
+	}
+
+	on, err := outletSvc.UpdateRecentEntriesVisibility(ctx, ownerID, outletID, true, "127.0.0.1", "test")
+	if err != nil {
+		t.Fatalf("owner enable recent entries: %v", err)
+	}
+	if !on.ShowRecentEntriesToEmployees {
+		t.Errorf("recent entries visibility = %v, want true", on.ShowRecentEntriesToEmployees)
+	}
+	off, err := outletSvc.UpdateRecentEntriesVisibility(ctx, ownerID, outletID, false, "127.0.0.1", "test")
+	if err != nil {
+		t.Fatalf("owner disable recent entries: %v", err)
+	}
+	if off.ShowRecentEntriesToEmployees {
+		t.Errorf("recent entries visibility after disable = %v, want false", off.ShowRecentEntriesToEmployees)
+	}
+
+	total, err := outletSvc.UpdateTotalTimeTodayVisibility(ctx, ownerID, outletID, true, "127.0.0.1", "test")
+	if err != nil {
+		t.Fatalf("owner enable total time today: %v", err)
+	}
+	if !total.ShowTotalTimeTodayToEmployees {
+		t.Errorf("total time today visibility = %v, want true", total.ShowTotalTimeTodayToEmployees)
+	}
+
+	invited, err := outletSvc.InviteMember(ctx, ownerID, outletID, "employee@example.com", "127.0.0.1", "test")
+	if err != nil {
+		t.Fatalf("invite employee: %v", err)
+	}
+	if _, err := outletSvc.AcceptInvite(ctx, empID, invited.MembershipID, "127.0.0.1", "test"); err != nil {
+		t.Fatalf("accept invite: %v", err)
+	}
+
+	if _, err := outletSvc.UpdateRecentEntriesVisibility(ctx, empID, outletID, true, "127.0.0.1", "test"); !isAPIError(err, "FORBIDDEN") {
+		t.Errorf("employee recent entries err = %v, want FORBIDDEN", err)
+	}
+	if _, err := outletSvc.UpdateTotalTimeTodayVisibility(ctx, empID, outletID, true, "127.0.0.1", "test"); !isAPIError(err, "FORBIDDEN") {
+		t.Errorf("employee total time today err = %v, want FORBIDDEN", err)
+	}
+
+	seen, err := outletSvc.GetOutlet(ctx, empID, outletID)
+	if err != nil {
+		t.Fatalf("employee get outlet: %v", err)
+	}
+	if seen.ShowRecentEntriesToEmployees || !seen.ShowTotalTimeTodayToEmployees {
+		t.Errorf("employee get outlet visibility = %+v, want recent false / total true", seen)
+	}
+
+	empPage, err := outletSvc.GetMyOutlets(ctx, empID, httpapi.PageParams{Page: 0, Size: 20})
+	if err != nil {
+		t.Fatalf("employee mine: %v", err)
+	}
+	if len(empPage.Content) != 1 {
+		t.Fatalf("employee mine = %d outlets, want 1", len(empPage.Content))
+	}
+	nested := empPage.Content[0].Outlet
+	if nested.ShowRecentEntriesToEmployees || !nested.ShowTotalTimeTodayToEmployees {
+		t.Errorf("employee mine nested outlet visibility = %+v, want recent false / total true", nested)
+	}
+}

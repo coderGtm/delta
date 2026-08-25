@@ -37,6 +37,8 @@ func NewService(store *db.Store, a *audit.Recorder, m *metrics.Registry) *Servic
 	m.RegisterCounter("outlet_updated_total", nil)
 	m.RegisterCounter("outlet_deleted_total", nil)
 	m.RegisterCounter("outlet_geofence_updated_total", []string{"enabled"}, []string{"true"}, []string{"false"})
+	m.RegisterCounter("outlet_recent_entries_visibility_updated_total", []string{"enabled"}, []string{"true"}, []string{"false"})
+	m.RegisterCounter("outlet_total_time_today_visibility_updated_total", []string{"enabled"}, []string{"true"}, []string{"false"})
 	m.RegisterCounter("outlet_membership_invited_total", nil)
 	m.RegisterCounter("outlet_membership_accepted_total", nil)
 	m.RegisterCounter("outlet_membership_rejected_total", nil)
@@ -93,14 +95,16 @@ type UpdateOutletRequest struct {
 
 // OutletResponse is the API representation of an outlet.
 type OutletResponse struct {
-	ID              uuid.UUID       `json:"id"`
-	Name            string          `json:"name"`
-	Latitude        decimal.Decimal `json:"latitude"`
-	Longitude       decimal.Decimal `json:"longitude"`
-	RadiusMeters    int             `json:"radiusMeters"`
-	GeofenceEnabled bool            `json:"geofenceEnabled"`
-	CreatedAt       time.Time       `json:"createdAt"`
-	UpdatedAt       time.Time       `json:"updatedAt"`
+	ID                            uuid.UUID       `json:"id"`
+	Name                          string          `json:"name"`
+	Latitude                      decimal.Decimal `json:"latitude"`
+	Longitude                     decimal.Decimal `json:"longitude"`
+	RadiusMeters                  int             `json:"radiusMeters"`
+	GeofenceEnabled               bool            `json:"geofenceEnabled"`
+	ShowRecentEntriesToEmployees  bool            `json:"showRecentEntriesToEmployees"`
+	ShowTotalTimeTodayToEmployees bool            `json:"showTotalTimeTodayToEmployees"`
+	CreatedAt                     time.Time       `json:"createdAt"`
+	UpdatedAt                     time.Time       `json:"updatedAt"`
 }
 
 // validateOutlet checks the request fields and returns a VALIDATION_ERROR API
@@ -181,14 +185,16 @@ func toOutletResponse(o *db.Outlet) (*OutletResponse, error) {
 		return nil, err
 	}
 	return &OutletResponse{
-		ID:              toUUID(o.ID),
-		Name:            o.Name,
-		Latitude:        lat,
-		Longitude:       lon,
-		RadiusMeters:    int(o.RadiusMeters),
-		GeofenceEnabled: o.GeofenceEnabled,
-		CreatedAt:       o.CreatedAt.Time,
-		UpdatedAt:       o.UpdatedAt.Time,
+		ID:                            toUUID(o.ID),
+		Name:                          o.Name,
+		Latitude:                      lat,
+		Longitude:                     lon,
+		RadiusMeters:                  int(o.RadiusMeters),
+		GeofenceEnabled:               o.GeofenceEnabled,
+		ShowRecentEntriesToEmployees:  o.ShowRecentEntriesToEmployees,
+		ShowTotalTimeTodayToEmployees: o.ShowTotalTimeTodayToEmployees,
+		CreatedAt:                     o.CreatedAt.Time,
+		UpdatedAt:                     o.UpdatedAt.Time,
 	}, nil
 }
 
@@ -356,6 +362,52 @@ func (s *Service) UpdateGeofence(ctx context.Context, userID, outletID uuid.UUID
 	}
 	s.Metrics.Increment("outlet_geofence_updated_total", "enabled", strconv.FormatBool(updated.GeofenceEnabled))
 	s.Audit.Record(ctx, userID.String(), "OUTLET_GEOFENCE_UPDATED", "OUTLET", outletID, map[string]any{"geofenceEnabled": updated.GeofenceEnabled}, ip, userAgent)
+	return toOutletResponse(&updated)
+}
+
+// UpdateRecentEntriesVisibility controls whether employees see their recent
+// attendance entries on the mobile attendance screen. Only accepted outlet
+// owners may perform this action.
+func (s *Service) UpdateRecentEntriesVisibility(ctx context.Context, userID, outletID uuid.UUID, enabled bool, ip, userAgent string) (*OutletResponse, error) {
+	if _, err := s.assertOwner(ctx, outletID, userID); err != nil {
+		return nil, err
+	}
+	if _, err := s.getActiveOutlet(ctx, outletID); err != nil {
+		return nil, err
+	}
+	updated, err := s.Store.Querier().UpdateOutletRecentEntriesVisibility(ctx, db.UpdateOutletRecentEntriesVisibilityParams{
+		ID:                           pgUUID(outletID),
+		ShowRecentEntriesToEmployees: enabled,
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.Metrics.Increment("outlet_recent_entries_visibility_updated_total", "enabled", strconv.FormatBool(updated.ShowRecentEntriesToEmployees))
+	s.Audit.Record(ctx, userID.String(), "OUTLET_RECENT_ENTRIES_VISIBILITY_UPDATED", "OUTLET", outletID,
+		map[string]any{"showRecentEntriesToEmployees": updated.ShowRecentEntriesToEmployees}, ip, userAgent)
+	return toOutletResponse(&updated)
+}
+
+// UpdateTotalTimeTodayVisibility controls whether employees see their total
+// time logged today on the mobile attendance screen. Only accepted outlet
+// owners may perform this action.
+func (s *Service) UpdateTotalTimeTodayVisibility(ctx context.Context, userID, outletID uuid.UUID, enabled bool, ip, userAgent string) (*OutletResponse, error) {
+	if _, err := s.assertOwner(ctx, outletID, userID); err != nil {
+		return nil, err
+	}
+	if _, err := s.getActiveOutlet(ctx, outletID); err != nil {
+		return nil, err
+	}
+	updated, err := s.Store.Querier().UpdateOutletTotalTimeTodayVisibility(ctx, db.UpdateOutletTotalTimeTodayVisibilityParams{
+		ID:                            pgUUID(outletID),
+		ShowTotalTimeTodayToEmployees: enabled,
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.Metrics.Increment("outlet_total_time_today_visibility_updated_total", "enabled", strconv.FormatBool(updated.ShowTotalTimeTodayToEmployees))
+	s.Audit.Record(ctx, userID.String(), "OUTLET_TOTAL_TIME_TODAY_VISIBILITY_UPDATED", "OUTLET", outletID,
+		map[string]any{"showTotalTimeTodayToEmployees": updated.ShowTotalTimeTodayToEmployees}, ip, userAgent)
 	return toOutletResponse(&updated)
 }
 

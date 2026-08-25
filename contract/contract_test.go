@@ -64,6 +64,8 @@ func buildTestServer(t *testing.T) (*httptest.Server, *StubFirebase, *db.Store) 
 	apiMux.Handle("GET /api/v1/outlets/{outletId}", auth.Require(http.HandlerFunc(outletHandlers.GetOutlet)))
 	apiMux.Handle("PUT /api/v1/outlets/{outletId}", auth.Require(http.HandlerFunc(outletHandlers.UpdateOutlet)))
 	apiMux.Handle("PUT /api/v1/outlets/{outletId}/geofence", auth.Require(http.HandlerFunc(outletHandlers.UpdateGeofence)))
+	apiMux.Handle("PUT /api/v1/outlets/{outletId}/recent-entries-visibility", auth.Require(http.HandlerFunc(outletHandlers.UpdateRecentEntriesVisibility)))
+	apiMux.Handle("PUT /api/v1/outlets/{outletId}/total-time-today-visibility", auth.Require(http.HandlerFunc(outletHandlers.UpdateTotalTimeTodayVisibility)))
 	apiMux.Handle("GET /api/v1/outlets/mine", auth.Require(http.HandlerFunc(outletHandlers.GetMyOutlets)))
 	apiMux.Handle("GET /api/v1/outlets/invites", auth.Require(http.HandlerFunc(outletHandlers.GetMyInvites)))
 	apiMux.Handle("GET /api/v1/outlets/{outletId}/memberships", auth.Require(http.HandlerFunc(outletHandlers.GetOutletMemberships)))
@@ -318,9 +320,10 @@ func TestContractEndpoints(t *testing.T) {
 		status, _, body := doJSON(t, client, http.MethodPost, server.URL+"/api/v1/outlets", ownerBearer,
 			map[string]any{"name": "HQ", "latitude": 40.7128, "longitude": -74.0060, "radiusMeters": 100})
 		assertStatus(t, status, http.StatusCreated)
-		assertJSONKeys(t, body, "id", "name", "latitude", "longitude", "radiusMeters", "geofenceEnabled", "createdAt", "updatedAt")
+		assertJSONKeys(t, body, "id", "name", "latitude", "longitude", "radiusMeters", "geofenceEnabled", "showRecentEntriesToEmployees", "showTotalTimeTodayToEmployees", "createdAt", "updatedAt")
 		outletMap := decodeMap(t, body)
-		if outletMap["name"] != "HQ" || outletMap["geofenceEnabled"] != false {
+		if outletMap["name"] != "HQ" || outletMap["geofenceEnabled"] != false ||
+			outletMap["showRecentEntriesToEmployees"] != false || outletMap["showTotalTimeTodayToEmployees"] != false {
 			t.Errorf("created outlet = %v", outletMap)
 		}
 		outletID, _ := outletMap["id"].(string)
@@ -355,6 +358,42 @@ func TestContractEndpoints(t *testing.T) {
 			map[string]any{"geofenceEnabled": true})
 		assertStatus(t, status, http.StatusForbidden)
 		assertError(t, body, "FORBIDDEN", "Only outlet owners can perform this action")
+
+		status, _, body = doJSON(t, client, http.MethodPut, server.URL+"/api/v1/outlets/"+outletID+"/recent-entries-visibility", empBearer,
+			map[string]any{"showRecentEntriesToEmployees": true})
+		assertStatus(t, status, http.StatusForbidden)
+		assertError(t, body, "FORBIDDEN", "Only outlet owners can perform this action")
+
+		status, _, body = doJSON(t, client, http.MethodPut, server.URL+"/api/v1/outlets/"+outletID+"/total-time-today-visibility", empBearer,
+			map[string]any{"showTotalTimeTodayToEmployees": true})
+		assertStatus(t, status, http.StatusForbidden)
+		assertError(t, body, "FORBIDDEN", "Only outlet owners can perform this action")
+
+		status, _, body = doJSON(t, client, http.MethodPut, server.URL+"/api/v1/outlets/"+outletID+"/recent-entries-visibility", ownerBearer,
+			map[string]any{})
+		assertStatus(t, status, http.StatusBadRequest)
+		assertError(t, body, "VALIDATION_ERROR", "Recent entries visibility flag is required")
+
+		status, _, body = doJSON(t, client, http.MethodPut, server.URL+"/api/v1/outlets/"+outletID+"/recent-entries-visibility", ownerBearer,
+			map[string]any{"showRecentEntriesToEmployees": true})
+		assertStatus(t, status, http.StatusOK)
+		if decodeMap(t, body)["showRecentEntriesToEmployees"] != true {
+			t.Errorf("recent entries visibility = %v", decodeMap(t, body))
+		}
+
+		status, _, body = doJSON(t, client, http.MethodPut, server.URL+"/api/v1/outlets/"+outletID+"/recent-entries-visibility", ownerBearer,
+			map[string]any{"showRecentEntriesToEmployees": false})
+		assertStatus(t, status, http.StatusOK)
+		if decodeMap(t, body)["showRecentEntriesToEmployees"] != false {
+			t.Errorf("recent entries visibility disable = %v", decodeMap(t, body))
+		}
+
+		status, _, body = doJSON(t, client, http.MethodPut, server.URL+"/api/v1/outlets/"+outletID+"/total-time-today-visibility", ownerBearer,
+			map[string]any{"showTotalTimeTodayToEmployees": true})
+		assertStatus(t, status, http.StatusOK)
+		if decodeMap(t, body)["showTotalTimeTodayToEmployees"] != true {
+			t.Errorf("total time today visibility = %v", decodeMap(t, body))
+		}
 
 		status, _, body = doJSON(t, client, http.MethodPost, server.URL+"/api/v1/outlets", ownerBearer,
 			map[string]any{"name": "", "latitude": 999, "longitude": -74.0060, "radiusMeters": 0})

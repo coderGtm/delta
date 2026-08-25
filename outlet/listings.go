@@ -15,25 +15,27 @@ import (
 // the user-facing listing queries. The db tags match the column aliases of
 // userMembershipsSQL exactly, as required by pgx.RowToStructByName.
 type userMembershipRow struct {
-	MembershipID    pgtype.UUID        `db:"membership_id"`
-	UserID          pgtype.UUID        `db:"user_id"`
-	Role            string             `db:"role"`
-	Status          string             `db:"status"`
-	DisplayName     string             `db:"display_name"`
-	InvitedByUserID pgtype.UUID        `db:"invited_by_user_id"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at"`
-	MemberUserID    pgtype.UUID        `db:"member_user_id"`
-	UserName        string             `db:"user_name"`
-	UserEmail       pgtype.Text        `db:"user_email"`
-	OutletID        pgtype.UUID        `db:"outlet_id"`
-	OutletName      string             `db:"outlet_name"`
-	Latitude        pgtype.Numeric     `db:"latitude"`
-	Longitude       pgtype.Numeric     `db:"longitude"`
-	RadiusMeters    int32              `db:"radius_meters"`
-	GeofenceEnabled bool               `db:"geofence_enabled"`
-	OutletCreatedAt pgtype.Timestamptz `db:"outlet_created_at"`
-	OutletUpdatedAt pgtype.Timestamptz `db:"outlet_updated_at"`
+	MembershipID                  pgtype.UUID        `db:"membership_id"`
+	UserID                        pgtype.UUID        `db:"user_id"`
+	Role                          string             `db:"role"`
+	Status                        string             `db:"status"`
+	DisplayName                   string             `db:"display_name"`
+	InvitedByUserID               pgtype.UUID        `db:"invited_by_user_id"`
+	CreatedAt                     pgtype.Timestamptz `db:"created_at"`
+	UpdatedAt                     pgtype.Timestamptz `db:"updated_at"`
+	MemberUserID                  pgtype.UUID        `db:"member_user_id"`
+	UserName                      string             `db:"user_name"`
+	UserEmail                     pgtype.Text        `db:"user_email"`
+	OutletID                      pgtype.UUID        `db:"outlet_id"`
+	OutletName                    string             `db:"outlet_name"`
+	Latitude                      pgtype.Numeric     `db:"latitude"`
+	Longitude                     pgtype.Numeric     `db:"longitude"`
+	RadiusMeters                  int32              `db:"radius_meters"`
+	GeofenceEnabled               bool               `db:"geofence_enabled"`
+	ShowRecentEntriesToEmployees  bool               `db:"show_recent_entries_to_employees"`
+	ShowTotalTimeTodayToEmployees bool               `db:"show_total_time_today_to_employees"`
+	OutletCreatedAt               pgtype.Timestamptz `db:"outlet_created_at"`
+	OutletUpdatedAt               pgtype.Timestamptz `db:"outlet_updated_at"`
 }
 
 // outletMembershipRow is a membership row joined with its user, outlet, and
@@ -42,28 +44,30 @@ type userMembershipRow struct {
 // pgx.RowToStructByName. OutletID is the membership's outlet id; MemberOutletID
 // is the id of the outlet row itself.
 type outletMembershipRow struct {
-	MembershipID    pgtype.UUID        `db:"membership_id"`
-	OutletID        pgtype.UUID        `db:"outlet_id"`
-	UserID          pgtype.UUID        `db:"user_id"`
-	Role            string             `db:"role"`
-	Status          string             `db:"status"`
-	DisplayName     string             `db:"display_name"`
-	InvitedByUserID pgtype.UUID        `db:"invited_by_user_id"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at"`
-	MemberUserID    pgtype.UUID        `db:"member_user_id"`
-	UserName        string             `db:"user_name"`
-	UserEmail       pgtype.Text        `db:"user_email"`
-	MemberOutletID  pgtype.UUID        `db:"outlet_id_2"`
-	OutletName      string             `db:"outlet_name"`
-	Latitude        pgtype.Numeric     `db:"latitude"`
-	Longitude       pgtype.Numeric     `db:"longitude"`
-	RadiusMeters    int32              `db:"radius_meters"`
-	GeofenceEnabled bool               `db:"geofence_enabled"`
-	OutletCreatedAt pgtype.Timestamptz `db:"outlet_created_at"`
-	OutletUpdatedAt pgtype.Timestamptz `db:"outlet_updated_at"`
-	InviterUserID   pgtype.UUID        `db:"inviter_user_id"`
-	InviterUserName pgtype.Text        `db:"inviter_user_name"`
+	MembershipID                  pgtype.UUID        `db:"membership_id"`
+	OutletID                      pgtype.UUID        `db:"outlet_id"`
+	UserID                        pgtype.UUID        `db:"user_id"`
+	Role                          string             `db:"role"`
+	Status                        string             `db:"status"`
+	DisplayName                   string             `db:"display_name"`
+	InvitedByUserID               pgtype.UUID        `db:"invited_by_user_id"`
+	CreatedAt                     pgtype.Timestamptz `db:"created_at"`
+	UpdatedAt                     pgtype.Timestamptz `db:"updated_at"`
+	MemberUserID                  pgtype.UUID        `db:"member_user_id"`
+	UserName                      string             `db:"user_name"`
+	UserEmail                     pgtype.Text        `db:"user_email"`
+	MemberOutletID                pgtype.UUID        `db:"outlet_id_2"`
+	OutletName                    string             `db:"outlet_name"`
+	Latitude                      pgtype.Numeric     `db:"latitude"`
+	Longitude                     pgtype.Numeric     `db:"longitude"`
+	RadiusMeters                  int32              `db:"radius_meters"`
+	GeofenceEnabled               bool               `db:"geofence_enabled"`
+	ShowRecentEntriesToEmployees  bool               `db:"show_recent_entries_to_employees"`
+	ShowTotalTimeTodayToEmployees bool               `db:"show_total_time_today_to_employees"`
+	OutletCreatedAt               pgtype.Timestamptz `db:"outlet_created_at"`
+	OutletUpdatedAt               pgtype.Timestamptz `db:"outlet_updated_at"`
+	InviterUserID                 pgtype.UUID        `db:"inviter_user_id"`
+	InviterUserName               pgtype.Text        `db:"inviter_user_name"`
 }
 
 // userMembershipsSQL lists a user's memberships in active outlets by status.
@@ -74,6 +78,7 @@ const userMembershipsSQL = `SELECT m.id AS membership_id, m.user_id AS user_id, 
 	u.id AS member_user_id, u.name AS user_name, u.email AS user_email,
 	o.id AS outlet_id, o.name AS outlet_name, o.latitude AS latitude, o.longitude AS longitude,
 	o.radius_meters AS radius_meters, o.geofence_enabled AS geofence_enabled,
+	o.show_recent_entries_to_employees AS show_recent_entries_to_employees, o.show_total_time_today_to_employees AS show_total_time_today_to_employees,
 	o.created_at AS outlet_created_at, o.updated_at AS outlet_updated_at
 FROM outlet_memberships m
 JOIN users u ON u.id = m.user_id
@@ -90,6 +95,7 @@ const outletMembershipsSQL = `SELECT m.id AS membership_id, m.outlet_id AS outle
 	m.created_at AS created_at, m.updated_at AS updated_at,
 	u.id AS member_user_id, u.name AS user_name, u.email AS user_email,
 	o.id AS outlet_id_2, o.name AS outlet_name, o.latitude AS latitude, o.longitude AS longitude,	o.radius_meters AS radius_meters, o.geofence_enabled AS geofence_enabled,
+	o.show_recent_entries_to_employees AS show_recent_entries_to_employees, o.show_total_time_today_to_employees AS show_total_time_today_to_employees,
 	o.created_at AS outlet_created_at, o.updated_at AS outlet_updated_at,
 	iu.id AS inviter_user_id, iu.name AS inviter_user_name
 FROM outlet_memberships m
@@ -184,14 +190,16 @@ func (s *Service) listUserMemberships(ctx context.Context, userID uuid.UUID, sta
 		}
 		user := db.User{ID: row.MemberUserID, Name: row.UserName, Email: row.UserEmail}
 		outlet := db.Outlet{
-			ID:              row.OutletID,
-			Name:            row.OutletName,
-			Latitude:        row.Latitude,
-			Longitude:       row.Longitude,
-			RadiusMeters:    row.RadiusMeters,
-			GeofenceEnabled: row.GeofenceEnabled,
-			CreatedAt:       row.OutletCreatedAt,
-			UpdatedAt:       row.OutletUpdatedAt,
+			ID:                            row.OutletID,
+			Name:                          row.OutletName,
+			Latitude:                      row.Latitude,
+			Longitude:                     row.Longitude,
+			RadiusMeters:                  row.RadiusMeters,
+			GeofenceEnabled:               row.GeofenceEnabled,
+			ShowRecentEntriesToEmployees:  row.ShowRecentEntriesToEmployees,
+			ShowTotalTimeTodayToEmployees: row.ShowTotalTimeTodayToEmployees,
+			CreatedAt:                     row.OutletCreatedAt,
+			UpdatedAt:                     row.OutletUpdatedAt,
 		}
 		item, err := mapMembership(m, user, outlet, nil)
 		if err != nil {
@@ -236,14 +244,16 @@ func (s *Service) listOutletMemberships(ctx context.Context, outletID uuid.UUID,
 		}
 		user := db.User{ID: row.MemberUserID, Name: row.UserName, Email: row.UserEmail}
 		outlet := db.Outlet{
-			ID:              row.MemberOutletID,
-			Name:            row.OutletName,
-			Latitude:        row.Latitude,
-			Longitude:       row.Longitude,
-			RadiusMeters:    row.RadiusMeters,
-			GeofenceEnabled: row.GeofenceEnabled,
-			CreatedAt:       row.OutletCreatedAt,
-			UpdatedAt:       row.OutletUpdatedAt,
+			ID:                            row.MemberOutletID,
+			Name:                          row.OutletName,
+			Latitude:                      row.Latitude,
+			Longitude:                     row.Longitude,
+			RadiusMeters:                  row.RadiusMeters,
+			GeofenceEnabled:               row.GeofenceEnabled,
+			ShowRecentEntriesToEmployees:  row.ShowRecentEntriesToEmployees,
+			ShowTotalTimeTodayToEmployees: row.ShowTotalTimeTodayToEmployees,
+			CreatedAt:                     row.OutletCreatedAt,
+			UpdatedAt:                     row.OutletUpdatedAt,
 		}
 		var inviter *db.User
 		if row.InviterUserID.Valid {

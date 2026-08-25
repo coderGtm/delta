@@ -37,6 +37,8 @@ var rateLimitPolicies = []policy{
 	{"POST", "/api/v1/outlets/*/attendance/manage", 60, time.Minute, true},
 	{"PUT", "/api/v1/outlets/*/attendance/*", 60, time.Minute, true},
 	{"PUT", "/api/v1/outlets/*/geofence", 20, time.Minute, true},
+	{"PUT", "/api/v1/outlets/*/recent-entries-visibility", 20, time.Minute, true},
+	{"PUT", "/api/v1/outlets/*/total-time-today-visibility", 20, time.Minute, true},
 	{"GET", "/api/v1/outlets/*/reports/salary", 30, time.Minute, true},
 	{"GET", "/api/v1/outlets/*/reports/salary.xlsx", 10, time.Minute, true},
 }

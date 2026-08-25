@@ -36,16 +36,18 @@ type AuditEvent struct {
 }
 
 type Outlet struct {
-	ID              pgtype.UUID
-	Name            string
-	Latitude        pgtype.Numeric
-	Longitude       pgtype.Numeric
-	RadiusMeters    int32
-	GeofenceEnabled bool
-	RemovedAt       pgtype.Timestamptz
-	RemovedByUserID pgtype.UUID
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	ID                            pgtype.UUID
+	Name                          string
+	Latitude                      pgtype.Numeric
+	Longitude                     pgtype.Numeric
+	RadiusMeters                  int32
+	GeofenceEnabled               bool
+	RemovedAt                     pgtype.Timestamptz
+	RemovedByUserID               pgtype.UUID
+	CreatedAt                     pgtype.Timestamptz
+	UpdatedAt                     pgtype.Timestamptz
+	ShowRecentEntriesToEmployees  bool
+	ShowTotalTimeTodayToEmployees bool
 }
 
 type OutletMembership struct {

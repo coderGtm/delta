@@ -93,14 +93,16 @@ func detailsParts(row db.GetMembershipDetailsByIDRow) (db.OutletMembership, db.U
 	}
 	user := db.User{ID: row.UserID_2, Name: row.UserName, Email: row.UserEmail}
 	outlet := db.Outlet{
-		ID:              row.OutletID_2,
-		Name:            row.OutletName,
-		Latitude:        row.Latitude,
-		Longitude:       row.Longitude,
-		RadiusMeters:    row.RadiusMeters,
-		GeofenceEnabled: row.GeofenceEnabled,
-		CreatedAt:       row.OutletCreatedAt,
-		UpdatedAt:       row.OutletUpdatedAt,
+		ID:                            row.OutletID_2,
+		Name:                          row.OutletName,
+		Latitude:                      row.Latitude,
+		Longitude:                     row.Longitude,
+		RadiusMeters:                  row.RadiusMeters,
+		GeofenceEnabled:               row.GeofenceEnabled,
+		ShowRecentEntriesToEmployees:  row.ShowRecentEntriesToEmployees,
+		ShowTotalTimeTodayToEmployees: row.ShowTotalTimeTodayToEmployees,
+		CreatedAt:                     row.OutletCreatedAt,
+		UpdatedAt:                     row.OutletUpdatedAt,
 	}
 	var inviter *db.User
 	if row.InvitedByUserID_2.Valid {

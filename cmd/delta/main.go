@@ -77,6 +77,8 @@ func main() {
 	apiMux.Handle("GET /api/v1/outlets/{outletId}", auth.Require(http.HandlerFunc(outletHandlers.GetOutlet)))
 	apiMux.Handle("PUT /api/v1/outlets/{outletId}", auth.Require(http.HandlerFunc(outletHandlers.UpdateOutlet)))
 	apiMux.Handle("PUT /api/v1/outlets/{outletId}/geofence", auth.Require(http.HandlerFunc(outletHandlers.UpdateGeofence)))
+	apiMux.Handle("PUT /api/v1/outlets/{outletId}/recent-entries-visibility", auth.Require(http.HandlerFunc(outletHandlers.UpdateRecentEntriesVisibility)))
+	apiMux.Handle("PUT /api/v1/outlets/{outletId}/total-time-today-visibility", auth.Require(http.HandlerFunc(outletHandlers.UpdateTotalTimeTodayVisibility)))
 	apiMux.Handle("GET /api/v1/outlets/mine", auth.Require(http.HandlerFunc(outletHandlers.GetMyOutlets)))
 	apiMux.Handle("GET /api/v1/outlets/invites", auth.Require(http.HandlerFunc(outletHandlers.GetMyInvites)))
 	apiMux.Handle("GET /api/v1/outlets/{outletId}/memberships", auth.Require(http.HandlerFunc(outletHandlers.GetOutletMemberships)))

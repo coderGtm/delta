@@ -324,6 +324,78 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/outlets/{outletId}/recent-entries-visibility:
+    put:
+      tags: [Outlets]
+      summary: Toggle recent entries visibility for employees
+      description: |
+        Controls whether employees see their recent attendance entries on the
+        mobile attendance screen. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOutletRecentEntriesVisibilityRequest'
+      responses:
+        '200':
+          description: The updated outlet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutletResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/UnauthorizedChallenge'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/outlets/{outletId}/total-time-today-visibility:
+    put:
+      tags: [Outlets]
+      summary: Toggle total time today visibility for employees
+      description: |
+        Controls whether employees see their total time logged today on the
+        mobile attendance screen. Owners only.
+      parameters:
+        - $ref: '#/components/parameters/OutletIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOutletTotalTimeTodayVisibilityRequest'
+      responses:
+        '200':
+          description: The updated outlet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutletResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/UnauthorizedChallenge'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/outlets/mine:
     get:
       tags: [Outlets]
@@ -1062,6 +1134,12 @@ components:
           format: int32
         geofenceEnabled:
           type: boolean
+        showRecentEntriesToEmployees:
+          type: boolean
+          description: Whether employees see their recent attendance entries.
+        showTotalTimeTodayToEmployees:
+          type: boolean
+          description: Whether employees see their total time logged today.
         createdAt:
           type: string
           format: date-time
@@ -1120,6 +1198,20 @@ components:
       required: [geofenceEnabled]
       properties:
         geofenceEnabled:
+          type: boolean
+    UpdateOutletRecentEntriesVisibilityRequest:
+      type: object
+      description: Request body of PUT /api/v1/outlets/{outletId}/recent-entries-visibility.
+      required: [showRecentEntriesToEmployees]
+      properties:
+        showRecentEntriesToEmployees:
+          type: boolean
+    UpdateOutletTotalTimeTodayVisibilityRequest:
+      type: object
+      description: Request body of PUT /api/v1/outlets/{outletId}/total-time-today-visibility.
+      required: [showTotalTimeTodayToEmployees]
+      properties:
+        showTotalTimeTodayToEmployees:
           type: boolean
     MembershipResponse:
       type: object

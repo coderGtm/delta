@@ -18,6 +18,12 @@ RETURNING *;
 -- name: UpdateOutletGeofence :one
 UPDATE outlets SET geofence_enabled = $2, updated_at = now() WHERE id = $1 RETURNING *;
 
+-- name: UpdateOutletRecentEntriesVisibility :one
+UPDATE outlets SET show_recent_entries_to_employees = $2, updated_at = now() WHERE id = $1 RETURNING *;
+
+-- name: UpdateOutletTotalTimeTodayVisibility :one
+UPDATE outlets SET show_total_time_today_to_employees = $2, updated_at = now() WHERE id = $1 RETURNING *;
+
 -- name: DeleteOutlet :one
 UPDATE outlets SET removed_at = now(), removed_by_user_id = $2, updated_at = now()
 WHERE id = $1 RETURNING *;
@@ -59,7 +65,8 @@ RETURNING *;
 
 -- name: ListMembershipsForUserByStatus :many
 SELECT m.*, o.id AS outlet_id, o.name AS outlet_name, o.latitude, o.longitude, o.radius_meters,
-       o.geofence_enabled, o.removed_at AS outlet_removed_at, o.created_at AS outlet_created_at,
+       o.geofence_enabled, o.show_recent_entries_to_employees, o.show_total_time_today_to_employees,
+       o.removed_at AS outlet_removed_at, o.created_at AS outlet_created_at,
        o.updated_at AS outlet_updated_at
 FROM outlet_memberships m
 JOIN outlets o ON o.id = m.outlet_id
@@ -89,7 +96,8 @@ SELECT count(*) FROM outlet_memberships WHERE outlet_id = $1 AND removed_at IS N
 SELECT m.id, m.outlet_id, m.user_id, m.role, m.status, m.display_name, m.invited_by_user_id, m.removed_at, m.removed_by_user_id, m.created_at, m.updated_at,
        u.id AS user_id, u.name AS user_name, u.email AS user_email,
        o.id AS outlet_id, o.name AS outlet_name, o.latitude, o.longitude, o.radius_meters,
-       o.geofence_enabled, o.removed_at AS outlet_removed_at, o.created_at AS outlet_created_at,
+       o.geofence_enabled, o.show_recent_entries_to_employees, o.show_total_time_today_to_employees,
+       o.removed_at AS outlet_removed_at, o.created_at AS outlet_created_at,
        o.updated_at AS outlet_updated_at,
        iu.id AS invited_by_user_id, iu.name AS invited_by_user_name
 FROM outlet_memberships m

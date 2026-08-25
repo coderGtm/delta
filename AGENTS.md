@@ -116,6 +116,10 @@ db/migrations
 
 - Creating an outlet auto-creates an accepted `OWNER` membership for the creator.
 - Owners can invite existing users by email.
+- Outlets carry two owner-controlled employee-visibility settings, both defaulting to `false`, that govern what the mobile attendance screen may display:
+  - `showRecentEntriesToEmployees` toggled via `PUT /api/v1/outlets/{outletId}/recent-entries-visibility`.
+  - `showTotalTimeTodayToEmployees` toggled via `PUT /api/v1/outlets/{outletId}/total-time-today-visibility`.
+  - The flags only gate client-side rendering; they do not change attendance authorization or filtering. Employees read them from `OutletResponse`, including the nested outlet in membership listings.
 - Memberships carry an owner-controlled `displayName` that is initialized to the user's account name when the membership record is first created.
 - Owners can update a member's `displayName` via `PUT /api/v1/outlets/{outletId}/memberships/{membershipId}/display-name`.
 - The membership `displayName` is the human-facing identifier; it is forwarded to membership, attendance, and salary report responses (and the Excel export).

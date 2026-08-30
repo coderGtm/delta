@@ -1,0 +1,10 @@
+# Place at /etc/caddy/Caddyfile on the server (host-installed Caddy).
+# Requires DNS: delta-attendance.cloud  A  <server-ip>  (pointed at your VPS)
+#
+# If you run Caddy as a Docker container on the same network as the app
+# instead, replace 127.0.0.1:8080 with app:8080 and keep port 8080 unpublished.
+
+delta-attendance.cloud {
+	encode gzip
+	reverse_proxy 127.0.0.1:8080
+}

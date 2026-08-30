@@ -40,9 +40,12 @@ out/
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 ### Monitoring local secrets ###
 monitoring/prometheus/prometheus-token.txt
 
 ### Firebase Service Account ###
 firebase/service-account.json
+# Compiled binary (make build)
+/delta
